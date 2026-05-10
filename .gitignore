@@ -220,8 +220,11 @@ __marimo__/
 ### ----- Project-specific (MLB-Pitch-Predictor) -----
 
 ### Raw & processed data — never commit pybaseball pulls
-data/
+data/*
 !data/.gitkeep
+!data/cache/
+data/cache/*
+!data/cache/.gitkeep
 
 ### Serialized models & encoders
 models/
