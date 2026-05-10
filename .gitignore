@@ -216,3 +216,35 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+### ----- Project-specific (MLB-Pitch-Predictor) -----
+
+### Raw & processed data — never commit pybaseball pulls
+data/
+!data/.gitkeep
+
+### Serialized models & encoders
+models/
+!models/.gitkeep
+*.pkl
+*.joblib
+*.h5
+*.onnx
+*.pt
+*.pth
+
+### MLflow tracking artifacts (local file-store backend)
+mlruns/
+mlartifacts/
+mlflow.db
+
+### OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+### Docker
+*.pid
+docker-compose.override.yml
+
