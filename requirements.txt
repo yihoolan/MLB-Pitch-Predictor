@@ -1,0 +1,18 @@
+### ----- Core data / ML -----
+numpy==1.26.4
+pandas==2.2.3
+scikit-learn==1.5.2
+
+### ----- Data source (also used at inference time for fresh context) -----
+pybaseball==2.2.7
+
+### ----- API & UI -----
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.9.2
+python-multipart==0.0.12
+streamlit==1.39.0
+requests==2.32.3
+
+### ----- Experiment tracking & model registry -----
+mlflow==2.17.2
