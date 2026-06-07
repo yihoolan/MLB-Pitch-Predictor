@@ -67,3 +67,44 @@ class UsageImputer:
 
     def fit_transform(self, df: pd.DataFrame) -> pd.DataFrame:
         return self.fit(df).transform(df)
+
+
+from typing import Literal
+
+import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+
+from utils.features.feature_names import BATTER_OUTCOME_COLUMNS, PITCHER_OUTCOME_COLUMNS
+
+
+def outcome_pca(
+    df: pd.DataFrame,
+    side: Literal["pitcher", "batter"],
+    n_components: int = 5,
+    *,
+    random_state: int = 42,
+) -> tuple[np.ndarray, PCA, list[str], StandardScaler, SimpleImputer]:
+    """Optional nb04 experiment — PCA on outcome cols (usage excluded)."""
+    if side == "pitcher":
+        cols = [c for c in PITCHER_OUTCOME_COLUMNS if c in df.columns]
+        prefix = "pit"
+    else:
+        cols = [c for c in BATTER_OUTCOME_COLUMNS if c in df.columns]
+        prefix = "bat"
+
+    if not cols:
+        empty = np.zeros((len(df), 0))
+        return empty, PCA(), [], StandardScaler(), SimpleImputer()
+
+    imputer = SimpleImputer(strategy="median")
+    scaler = StandardScaler()
+    X = scaler.fit_transform(imputer.fit_transform(df[cols]))
+
+    n_components = min(n_components, X.shape[1], X.shape[0])
+    pca = PCA(n_components=n_components, random_state=random_state)
+    components = pca.fit_transform(X)
+
+    labels = [f"PC{i + 1}_{prefix}" for i in range(components.shape[1])]
+    return components, pca, labels, scaler, imputer
