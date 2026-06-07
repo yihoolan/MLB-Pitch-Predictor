@@ -1,6 +1,21 @@
 from __future__ import annotations
 
+from typing import Literal
+
+import numpy as np
 import pandas as pd
+from sklearn.compose import ColumnTransformer
+from sklearn.decomposition import PCA
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OrdinalEncoder, StandardScaler
+
+from utils.features.feature_names import (
+    BATTER_OUTCOME_COLUMNS,
+    BATTER_USAGE_COLUMNS,
+    CANDIDATE_GAME_STATE_COLUMNS,
+    PITCHER_OUTCOME_COLUMNS,
+    PITCHER_USAGE_COLUMNS,
+)
 
 BASE_COLS = ["on_1b", "on_2b", "on_3b"]
 CATEGORICAL_COLS = {"stand", "p_throws"}
@@ -69,16 +84,6 @@ class UsageImputer:
         return self.fit(df).transform(df)
 
 
-from typing import Literal
-
-import numpy as np
-from sklearn.decomposition import PCA
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler
-
-from utils.features.feature_names import BATTER_OUTCOME_COLUMNS, PITCHER_OUTCOME_COLUMNS
-
-
 def outcome_pca(
     df: pd.DataFrame,
     side: Literal["pitcher", "batter"],
@@ -108,3 +113,79 @@ def outcome_pca(
 
     labels = [f"PC{i + 1}_{prefix}" for i in range(components.shape[1])]
     return components, pca, labels, scaler, imputer
+
+
+def build_feature_matrix(
+    df: pd.DataFrame,
+    candidate_cols: list[str],
+    *,
+    fit: bool = True,
+    preprocessor: ColumnTransformer | None = None,
+    usage_imputers: dict[str, UsageImputer] | None = None,
+    pca_components: np.ndarray | None = None,
+    pca_labels: list[str] | None = None,
+) -> tuple[np.ndarray, list[str], ColumnTransformer | None]:
+    """Assemble a numeric feature matrix for a candidate column set (EDA experiments)."""
+    cols = [c for c in candidate_cols if c in df.columns]
+    work = binarize_bases(df)
+
+    ### Usage imputation when usage cols are in the candidate set
+    if usage_imputers is None:
+        usage_imputers = {}
+        if any(c in cols for c in PITCHER_USAGE_COLUMNS):
+            usage_imputers["pitcher"] = UsageImputer(PITCHER_USAGE_COLUMNS, stratify_col="p_throws")
+        if any(c in cols for c in BATTER_USAGE_COLUMNS):
+            usage_imputers["batter"] = UsageImputer(BATTER_USAGE_COLUMNS, stratify_col="stand")
+
+    for imputer in usage_imputers.values():
+        if fit:
+            work = imputer.fit_transform(work)
+        else:
+            work = imputer.transform(work)
+
+    cat_cols = [c for c in cols if c in CATEGORICAL_COLS or work[c].dtype == object]
+    num_cols = [c for c in cols if c not in cat_cols]
+
+    if preprocessor is None:
+        preprocessor = ColumnTransformer(
+            transformers=[
+                (
+                    "cat",
+                    OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
+                    cat_cols,
+                ),
+                ("num", SimpleImputer(strategy="median"), num_cols),
+            ],
+            remainder="drop",
+        )
+
+    if fit:
+        X = preprocessor.fit_transform(work[cols])
+    else:
+        X = preprocessor.transform(work[cols])
+
+    feature_names = cat_cols + num_cols
+
+    if pca_components is not None and pca_components.shape[1] > 0:
+        X = np.hstack([X, pca_components])
+        feature_names = feature_names + (pca_labels or [])
+
+    return X, feature_names, preprocessor
+
+
+def feature_group(name: str) -> str:
+    """Map a feature name to its EDA tier for importance plots."""
+    if name.startswith("PC") and (name.endswith("_pit") or name.endswith("_bat")):
+        side = "pitcher" if name.endswith("_pit") else "batter"
+        return f"{side} outcome PCA"
+    if name in CANDIDATE_GAME_STATE_COLUMNS:
+        return "Game state"
+    if name in PITCHER_USAGE_COLUMNS:
+        return "Pitcher usage"
+    if name in BATTER_USAGE_COLUMNS:
+        return "Batter usage"
+    if name in PITCHER_OUTCOME_COLUMNS:
+        return "Pitcher outcome"
+    if name in BATTER_OUTCOME_COLUMNS:
+        return "Batter outcome"
+    return "Other"
