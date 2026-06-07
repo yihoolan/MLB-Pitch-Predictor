@@ -1,13 +1,13 @@
 ### Column classification for the raw Statcast frame (118 cols) and pybaseball enrichment tables.
 ### Source: https://baseballsavant.mlb.com/csv-docs
 ###
-### STATCAST_DEPRECATED  – always-null legacy fields from the old PitchFX tracking system.
-### STATCAST_POST_PITCH  – pitch physics and outcomes known only after the pitch is thrown;
+### STATCAST_DEPRECATED  — always-null legacy fields from the old PitchFX tracking system.
+### STATCAST_POST_PITCH  — pitch physics and outcomes known only after the pitch is thrown;
 ###                        using these as model inputs would constitute data leakage.
-### STATCAST_LOGISTICS   – identifiers and bookkeeping columns retained for joins / temporal
+### STATCAST_LOGISTICS   — identifiers and bookkeeping columns retained for joins / temporal
 ###                        splits / deduplication, but not fed to the model directly.
-### STATCAST_PRE_PITCH   – valid game-state features available before the pitch is thrown.
-### FANGRAPH_PRE_PITCH   – prior-year enrichment columns joined from pybaseball leaderboards
+### STATCAST_PRE_PITCH   — valid game-state features available before the pitch is thrown.
+### FANGRAPH_PRE_PITCH   — prior-year enrichment columns joined from pybaseball leaderboards
 ###                        (statcast_pitcher_pitch_arsenal, statcast_pitcher_arsenal_stats,
 ###                         statcast_batter_expected_stats, statcast_batter_pitch_arsenal).
 ###                        All are leak-free because they come from SEASON - 1.
@@ -110,25 +110,15 @@ STATCAST_LOGISTICS: list[str] = [
     "batter_days_until_next_game",
 ]
 
-### Useful pre-pitch game-state features
-STATCAST_PRE_PITCH: list[str] = [
-    "balls",
-    "strikes",
-    "outs_when_up",
-    "on_1b",
-    "on_2b",
-    "on_3b",
-    "inning",
-    "inning_topbot",
-    "bat_score_diff",
+### Pre-pitch fields removed from EDA_COLUMNS (documented for audit notebooks)
+STATCAST_DROPPED: list[str] = [
+    "pitcher",
+    "batter",
+    "fielder_2",
     "home_score_diff",
     "home_win_exp",
     "bat_win_exp",
-    "stand",
-    "p_throws",
-    "pitcher",
-    "batter",
-    "pitch_number",
+    "inning_topbot",
     "n_thruorder_pitcher",
     "n_priorpa_thisgame_player_at_bat",
     "pitcher_days_since_prev_game",
@@ -136,7 +126,6 @@ STATCAST_PRE_PITCH: list[str] = [
     "batter_days_since_prev_game",
     "if_fielding_alignment",
     "of_fielding_alignment",
-    "fielder_2",
     "sz_top",
     "sz_bot",
     "age_pit",
@@ -145,10 +134,25 @@ STATCAST_PRE_PITCH: list[str] = [
     "game_type",
 ]
 
-### Pitch type codes
-_PITCH_TYPES: list[str] = ["FF", "SI", "FC", "SL", "CH", "CU", "FS", "KN", "ST", "SV"]
+### Serving-aligned game context under evaluation in EDA notebooks
+CANDIDATE_GAME_STATE_COLUMNS: list[str] = [
+    "inning",
+    "bat_score_diff",
+    "balls",
+    "strikes",
+    "pitch_number",
+    "outs_when_up",
+    "on_1b",
+    "on_2b",
+    "on_3b",
+    "stand",
+    "p_throws",
+]
 
-### pitcher aresenal
+### Pitch type codes (Statcast abbreviations)
+PITCH_TYPES: list[str] = ["FF", "SI", "FC", "SL", "CH", "CU", "FS", "KN", "ST", "SV"]
+
+### Arsenal stat families from statcast_pitcher_arsenal_stats / statcast_batter_pitch_arsenal
 _ARSENAL_STATS: list[str] = [
     "run_value_per_100",
     "run_value",
@@ -167,33 +171,41 @@ _ARSENAL_STATS: list[str] = [
     "hard_hit_percent",
 ]
 
-### prior-year enrichment columns (all leakage-free)
-FANGRAPH_PRE_PITCH: list[str] = [
-    "n_ff",
-    "n_si",
-    "n_fc",
-    "n_sl",
-    "n_ch",
-    "n_cu",
-    "n_fs",
-    "n_kn",
-    "n_st",
-    "n_sv",
-    *[f"{stat}_{pt}" for stat in _ARSENAL_STATS for pt in _PITCH_TYPES],
-    "pa",
-    "bip",
-    "ba",
-    "est_ba",
-    "est_ba_minus_ba_diff",
-    "slg",
-    "est_slg",
-    "est_slg_minus_slg_diff",
-    "woba",
-    "est_woba",
-    "est_woba_minus_woba_diff",
-    *[f"bat_{stat}_{pt}" for stat in _ARSENAL_STATS for pt in _PITCH_TYPES],
-]
+USAGE_STAT: str = "pitch_usage"
+OUTCOME_STATS: list[str] = [s for s in _ARSENAL_STATS if s != USAGE_STAT]
 
-### convenience alias
-TRAINABLE_COLUMNS: list[str] = STATCAST_PRE_PITCH + FANGRAPH_PRE_PITCH
+PITCHER_USAGE_COLUMNS: list[str] = [f"{USAGE_STAT}_{pt}" for pt in PITCH_TYPES]
+BATTER_USAGE_COLUMNS: list[str] = [f"bat_{USAGE_STAT}_{pt}" for pt in PITCH_TYPES]
+
+PITCHER_OUTCOME_COLUMNS: list[str] = [f"{stat}_{pt}" for stat in OUTCOME_STATS for pt in PITCH_TYPES]
+BATTER_OUTCOME_COLUMNS: list[str] = [f"bat_{stat}_{pt}" for stat in OUTCOME_STATS for pt in PITCH_TYPES]
+
+ENRICHMENT_COLUMNS: list[str] = (
+    PITCHER_USAGE_COLUMNS + BATTER_USAGE_COLUMNS + PITCHER_OUTCOME_COLUMNS + BATTER_OUTCOME_COLUMNS
+)
+
+EDA_COLUMNS: list[str] = CANDIDATE_GAME_STATE_COLUMNS + ENRICHMENT_COLUMNS
+
+### Deprecated alias of EDA_COLUMNS; use MODEL_FEATURES for training
+TRAINABLE_COLUMNS: list[str] = EDA_COLUMNS
+MERGE_KEYS: list[str] = ["pitcher", "batter"]
+
 LABEL_COLUMN: str = "pitch_type"
+
+### Candidate sets A–E; B is the production choice (MODEL_FEATURES)
+CANDIDATE_SET_A: list[str] = CANDIDATE_GAME_STATE_COLUMNS
+CANDIDATE_SET_B: list[str] = CANDIDATE_GAME_STATE_COLUMNS + PITCHER_USAGE_COLUMNS + BATTER_USAGE_COLUMNS
+CANDIDATE_SET_C: list[str] = CANDIDATE_SET_B + PITCHER_OUTCOME_COLUMNS
+CANDIDATE_SET_D: list[str] = CANDIDATE_SET_B + BATTER_OUTCOME_COLUMNS
+CANDIDATE_SET_E: list[str] = CANDIDATE_SET_B + PITCHER_OUTCOME_COLUMNS + BATTER_OUTCOME_COLUMNS
+
+CANDIDATE_FEATURE_SETS: dict[str, list[str]] = {
+    "A": CANDIDATE_SET_A,
+    "B": CANDIDATE_SET_B,
+    "C": CANDIDATE_SET_C,
+    "D": CANDIDATE_SET_D,
+    "E": CANDIDATE_SET_E,
+}
+
+### the feature set chosen based on results in exploration/04_feature_importance_ml.ipynb
+MODEL_FEATURES: list[str] = CANDIDATE_SET_B
