@@ -110,25 +110,15 @@ STATCAST_LOGISTICS: list[str] = [
     "batter_days_until_next_game",
 ]
 
-### Useful pre-pitch game-state features
-STATCAST_PRE_PITCH: list[str] = [
-    "balls",
-    "strikes",
-    "outs_when_up",
-    "on_1b",
-    "on_2b",
-    "on_3b",
-    "inning",
-    "inning_topbot",
-    "bat_score_diff",
+### Pre-pitch fields removed from EDA_COLUMNS (documented for audit notebooks)
+STATCAST_DROPPED: list[str] = [
+    "pitcher",
+    "batter",
+    "fielder_2",
     "home_score_diff",
     "home_win_exp",
     "bat_win_exp",
-    "stand",
-    "p_throws",
-    "pitcher",
-    "batter",
-    "pitch_number",
+    "inning_topbot",
     "n_thruorder_pitcher",
     "n_priorpa_thisgame_player_at_bat",
     "pitcher_days_since_prev_game",
@@ -136,13 +126,27 @@ STATCAST_PRE_PITCH: list[str] = [
     "batter_days_since_prev_game",
     "if_fielding_alignment",
     "of_fielding_alignment",
-    "fielder_2",
     "sz_top",
     "sz_bot",
     "age_pit",
     "age_bat",
     "game_year",
     "game_type",
+]
+
+### Serving-aligned game context under evaluation in EDA notebooks
+CANDIDATE_GAME_STATE_COLUMNS: list[str] = [
+    "inning",
+    "bat_score_diff",
+    "balls",
+    "strikes",
+    "pitch_number",
+    "outs_when_up",
+    "on_1b",
+    "on_2b",
+    "on_3b",
+    "stand",
+    "p_throws",
 ]
 
 ### Pitch type codes
@@ -195,7 +199,7 @@ FANGRAPH_PRE_PITCH: list[str] = [
 ]
 
 ### convenience alias
-TRAINABLE_COLUMNS: list[str] = STATCAST_PRE_PITCH + FANGRAPH_PRE_PITCH
+TRAINABLE_COLUMNS: list[str] = CANDIDATE_GAME_STATE_COLUMNS + FANGRAPH_PRE_PITCH
 MERGE_KEYS: list[str] = ["pitcher", "batter"]
 
 LABEL_COLUMN: str = "pitch_type"
