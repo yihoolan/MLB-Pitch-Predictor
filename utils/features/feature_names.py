@@ -146,7 +146,7 @@ STATCAST_PRE_PITCH: list[str] = [
 ]
 
 ### Pitch type codes
-_PITCH_TYPES: list[str] = ["FF", "SI", "FC", "SL", "CH", "CU", "FS", "KN", "ST", "SV"]
+PITCH_TYPES: list[str] = ["FF", "SI", "FC", "SL", "CH", "CU", "FS", "KN", "ST", "SV"]
 
 ### pitcher aresenal
 _ARSENAL_STATS: list[str] = [
@@ -179,7 +179,7 @@ FANGRAPH_PRE_PITCH: list[str] = [
     "n_kn",
     "n_st",
     "n_sv",
-    *[f"{stat}_{pt}" for stat in _ARSENAL_STATS for pt in _PITCH_TYPES],
+    *[f"{stat}_{pt}" for stat in _ARSENAL_STATS for pt in PITCH_TYPES],
     "pa",
     "bip",
     "ba",
@@ -191,9 +191,11 @@ FANGRAPH_PRE_PITCH: list[str] = [
     "woba",
     "est_woba",
     "est_woba_minus_woba_diff",
-    *[f"bat_{stat}_{pt}" for stat in _ARSENAL_STATS for pt in _PITCH_TYPES],
+    *[f"bat_{stat}_{pt}" for stat in _ARSENAL_STATS for pt in PITCH_TYPES],
 ]
 
 ### convenience alias
 TRAINABLE_COLUMNS: list[str] = STATCAST_PRE_PITCH + FANGRAPH_PRE_PITCH
+MERGE_KEYS: list[str] = ["pitcher", "batter"]
+
 LABEL_COLUMN: str = "pitch_type"
