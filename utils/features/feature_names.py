@@ -149,10 +149,10 @@ CANDIDATE_GAME_STATE_COLUMNS: list[str] = [
     "p_throws",
 ]
 
-### Pitch type codes
+### Pitch type codes (Statcast abbreviations)
 PITCH_TYPES: list[str] = ["FF", "SI", "FC", "SL", "CH", "CU", "FS", "KN", "ST", "SV"]
 
-### pitcher aresenal
+### Arsenal stat families from statcast_pitcher_arsenal_stats / statcast_batter_pitch_arsenal
 _ARSENAL_STATS: list[str] = [
     "run_value_per_100",
     "run_value",
@@ -171,35 +171,28 @@ _ARSENAL_STATS: list[str] = [
     "hard_hit_percent",
 ]
 
-### prior-year enrichment columns (all leakage-free)
-FANGRAPH_PRE_PITCH: list[str] = [
-    "n_ff",
-    "n_si",
-    "n_fc",
-    "n_sl",
-    "n_ch",
-    "n_cu",
-    "n_fs",
-    "n_kn",
-    "n_st",
-    "n_sv",
-    *[f"{stat}_{pt}" for stat in _ARSENAL_STATS for pt in PITCH_TYPES],
-    "pa",
-    "bip",
-    "ba",
-    "est_ba",
-    "est_ba_minus_ba_diff",
-    "slg",
-    "est_slg",
-    "est_slg_minus_slg_diff",
-    "woba",
-    "est_woba",
-    "est_woba_minus_woba_diff",
-    *[f"bat_{stat}_{pt}" for stat in _ARSENAL_STATS for pt in PITCH_TYPES],
+USAGE_STAT: str = "pitch_usage"
+OUTCOME_STATS: list[str] = [s for s in _ARSENAL_STATS if s != USAGE_STAT]
+
+PITCHER_USAGE_COLUMNS: list[str] = [f"{USAGE_STAT}_{pt}" for pt in PITCH_TYPES]
+BATTER_USAGE_COLUMNS: list[str] = [f"bat_{USAGE_STAT}_{pt}" for pt in PITCH_TYPES]
+
+PITCHER_OUTCOME_COLUMNS: list[str] = [
+    f"{stat}_{pt}" for stat in OUTCOME_STATS for pt in PITCH_TYPES
+]
+BATTER_OUTCOME_COLUMNS: list[str] = [
+    f"bat_{stat}_{pt}" for stat in OUTCOME_STATS for pt in PITCH_TYPES
 ]
 
-### convenience alias
-TRAINABLE_COLUMNS: list[str] = CANDIDATE_GAME_STATE_COLUMNS + FANGRAPH_PRE_PITCH
+ENRICHMENT_COLUMNS: list[str] = (
+    PITCHER_USAGE_COLUMNS
+    + BATTER_USAGE_COLUMNS
+    + PITCHER_OUTCOME_COLUMNS
+    + BATTER_OUTCOME_COLUMNS
+)
+
+### convenience alias (updated in next commit to EDA_COLUMNS)
+TRAINABLE_COLUMNS: list[str] = CANDIDATE_GAME_STATE_COLUMNS + ENRICHMENT_COLUMNS
 MERGE_KEYS: list[str] = ["pitcher", "batter"]
 
 LABEL_COLUMN: str = "pitch_type"
