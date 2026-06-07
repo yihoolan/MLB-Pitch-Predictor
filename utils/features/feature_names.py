@@ -1,13 +1,13 @@
 ### Column classification for the raw Statcast frame (118 cols) and pybaseball enrichment tables.
 ### Source: https://baseballsavant.mlb.com/csv-docs
 ###
-### STATCAST_DEPRECATED  – always-null legacy fields from the old PitchFX tracking system.
-### STATCAST_POST_PITCH  – pitch physics and outcomes known only after the pitch is thrown;
+### STATCAST_DEPRECATED  â€“ always-null legacy fields from the old PitchFX tracking system.
+### STATCAST_POST_PITCH  â€“ pitch physics and outcomes known only after the pitch is thrown;
 ###                        using these as model inputs would constitute data leakage.
-### STATCAST_LOGISTICS   – identifiers and bookkeeping columns retained for joins / temporal
+### STATCAST_LOGISTICS   â€“ identifiers and bookkeeping columns retained for joins / temporal
 ###                        splits / deduplication, but not fed to the model directly.
-### STATCAST_PRE_PITCH   – valid game-state features available before the pitch is thrown.
-### FANGRAPH_PRE_PITCH   – prior-year enrichment columns joined from pybaseball leaderboards
+### STATCAST_PRE_PITCH   â€“ valid game-state features available before the pitch is thrown.
+### FANGRAPH_PRE_PITCH   â€“ prior-year enrichment columns joined from pybaseball leaderboards
 ###                        (statcast_pitcher_pitch_arsenal, statcast_pitcher_arsenal_stats,
 ###                         statcast_batter_expected_stats, statcast_batter_pitch_arsenal).
 ###                        All are leak-free because they come from SEASON - 1.
