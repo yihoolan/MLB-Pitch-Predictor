@@ -91,7 +91,7 @@ def outcome_pca(
     *,
     random_state: int = 42,
 ) -> tuple[np.ndarray, PCA, list[str], StandardScaler, SimpleImputer]:
-    """Optional nb04 experiment — PCA on outcome cols (usage excluded)."""
+    """Exploratory only (nb04 Section 1); not used in MODEL_FEATURES or production pipeline."""
     if side == "pitcher":
         cols = [c for c in PITCHER_OUTCOME_COLUMNS if c in df.columns]
         prefix = "pit"
@@ -125,7 +125,11 @@ def build_feature_matrix(
     pca_components: np.ndarray | None = None,
     pca_labels: list[str] | None = None,
 ) -> tuple[np.ndarray, list[str], ColumnTransformer | None]:
-    """Assemble a numeric feature matrix for a candidate column set (EDA experiments)."""
+    """Assemble a numeric feature matrix for a candidate column set.
+
+    Production training uses MODEL_FEATURES (Set B). Pass other CANDIDATE_SET_* lists
+    for comparison experiments (Sets A–E).
+    """
     cols = [c for c in candidate_cols if c in df.columns]
     work = binarize_bases(df)
 
@@ -174,7 +178,10 @@ def build_feature_matrix(
 
 
 def feature_group(name: str) -> str:
-    """Map a feature name to its EDA tier for importance plots."""
+    """Map a feature name to its EDA tier for importance plots.
+
+    Outcome and PCA groups remain for nb04 plots and rejected Sets C–E.
+    """
     if name.startswith("PC") and (name.endswith("_pit") or name.endswith("_bat")):
         side = "pitcher" if name.endswith("_pit") else "batter"
         return f"{side} outcome PCA"
