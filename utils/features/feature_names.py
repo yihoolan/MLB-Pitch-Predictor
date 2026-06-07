@@ -1,13 +1,13 @@
 ### Column classification for the raw Statcast frame (118 cols) and pybaseball enrichment tables.
 ### Source: https://baseballsavant.mlb.com/csv-docs
 ###
-### STATCAST_DEPRECATED  â€“ always-null legacy fields from the old PitchFX tracking system.
-### STATCAST_POST_PITCH  â€“ pitch physics and outcomes known only after the pitch is thrown;
+### STATCAST_DEPRECATED  — always-null legacy fields from the old PitchFX tracking system.
+### STATCAST_POST_PITCH  — pitch physics and outcomes known only after the pitch is thrown;
 ###                        using these as model inputs would constitute data leakage.
-### STATCAST_LOGISTICS   â€“ identifiers and bookkeeping columns retained for joins / temporal
+### STATCAST_LOGISTICS   — identifiers and bookkeeping columns retained for joins / temporal
 ###                        splits / deduplication, but not fed to the model directly.
-### STATCAST_PRE_PITCH   â€“ valid game-state features available before the pitch is thrown.
-### FANGRAPH_PRE_PITCH   â€“ prior-year enrichment columns joined from pybaseball leaderboards
+### STATCAST_PRE_PITCH   — valid game-state features available before the pitch is thrown.
+### FANGRAPH_PRE_PITCH   — prior-year enrichment columns joined from pybaseball leaderboards
 ###                        (statcast_pitcher_pitch_arsenal, statcast_pitcher_arsenal_stats,
 ###                         statcast_batter_expected_stats, statcast_batter_pitch_arsenal).
 ###                        All are leak-free because they come from SEASON - 1.
@@ -177,35 +177,35 @@ OUTCOME_STATS: list[str] = [s for s in _ARSENAL_STATS if s != USAGE_STAT]
 PITCHER_USAGE_COLUMNS: list[str] = [f"{USAGE_STAT}_{pt}" for pt in PITCH_TYPES]
 BATTER_USAGE_COLUMNS: list[str] = [f"bat_{USAGE_STAT}_{pt}" for pt in PITCH_TYPES]
 
-PITCHER_OUTCOME_COLUMNS: list[str] = [
-    f"{stat}_{pt}" for stat in OUTCOME_STATS for pt in PITCH_TYPES
-]
-BATTER_OUTCOME_COLUMNS: list[str] = [
-    f"bat_{stat}_{pt}" for stat in OUTCOME_STATS for pt in PITCH_TYPES
-]
+PITCHER_OUTCOME_COLUMNS: list[str] = [f"{stat}_{pt}" for stat in OUTCOME_STATS for pt in PITCH_TYPES]
+BATTER_OUTCOME_COLUMNS: list[str] = [f"bat_{stat}_{pt}" for stat in OUTCOME_STATS for pt in PITCH_TYPES]
 
 ENRICHMENT_COLUMNS: list[str] = (
-    PITCHER_USAGE_COLUMNS
-    + BATTER_USAGE_COLUMNS
-    + PITCHER_OUTCOME_COLUMNS
-    + BATTER_OUTCOME_COLUMNS
+    PITCHER_USAGE_COLUMNS + BATTER_USAGE_COLUMNS + PITCHER_OUTCOME_COLUMNS + BATTER_OUTCOME_COLUMNS
 )
 
 EDA_COLUMNS: list[str] = CANDIDATE_GAME_STATE_COLUMNS + ENRICHMENT_COLUMNS
 
-### Deprecated alias — use EDA_COLUMNS in new code
+### Deprecated alias of EDA_COLUMNS; use MODEL_FEATURES for training
 TRAINABLE_COLUMNS: list[str] = EDA_COLUMNS
 MERGE_KEYS: list[str] = ["pitcher", "batter"]
 
 LABEL_COLUMN: str = "pitch_type"
 
-### Candidate feature sets for notebook 04 experiments
+### Candidate sets A–E; B is the production choice (MODEL_FEATURES)
 CANDIDATE_SET_A: list[str] = CANDIDATE_GAME_STATE_COLUMNS
-CANDIDATE_SET_B: list[str] = (
-    CANDIDATE_GAME_STATE_COLUMNS + PITCHER_USAGE_COLUMNS + BATTER_USAGE_COLUMNS
-)
+CANDIDATE_SET_B: list[str] = CANDIDATE_GAME_STATE_COLUMNS + PITCHER_USAGE_COLUMNS + BATTER_USAGE_COLUMNS
 CANDIDATE_SET_C: list[str] = CANDIDATE_SET_B + PITCHER_OUTCOME_COLUMNS
 CANDIDATE_SET_D: list[str] = CANDIDATE_SET_B + BATTER_OUTCOME_COLUMNS
-CANDIDATE_SET_E: list[str] = (
-    CANDIDATE_SET_B + PITCHER_OUTCOME_COLUMNS + BATTER_OUTCOME_COLUMNS
-)
+CANDIDATE_SET_E: list[str] = CANDIDATE_SET_B + PITCHER_OUTCOME_COLUMNS + BATTER_OUTCOME_COLUMNS
+
+CANDIDATE_FEATURE_SETS: dict[str, list[str]] = {
+    "A": CANDIDATE_SET_A,
+    "B": CANDIDATE_SET_B,
+    "C": CANDIDATE_SET_C,
+    "D": CANDIDATE_SET_D,
+    "E": CANDIDATE_SET_E,
+}
+
+### the feature set chosen based on results in exploration/04_feature_importance_ml.ipynb
+MODEL_FEATURES: list[str] = CANDIDATE_SET_B
