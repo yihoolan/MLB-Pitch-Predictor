@@ -9,7 +9,7 @@ from sklearn.decomposition import PCA
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OrdinalEncoder, StandardScaler
 
-from utils.features.feature_names import (
+from utils.feature_names import (
     BATTER_OUTCOME_COLUMNS,
     BATTER_USAGE_COLUMNS,
     CANDIDATE_GAME_STATE_COLUMNS,
