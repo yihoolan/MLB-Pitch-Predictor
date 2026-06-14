@@ -69,10 +69,10 @@ def _fetch_handedness(mlbam_ids: list[int], role: Literal["pitcher", "batter"]) 
     missing = [i for i in mlbam_ids if i not in _handedness_cache]
     if not missing:
         return
+    # No fields filter — some MLB Stats API deployments ignore or truncate it.
     url = (
         "https://statsapi.mlb.com/api/v1/people"
         f"?personIds={','.join(str(i) for i in missing)}"
-        "&fields=people,id,pitchHand,batSide"
     )
     try:
         for p in requests.get(url, timeout=5).json().get("people", []):
