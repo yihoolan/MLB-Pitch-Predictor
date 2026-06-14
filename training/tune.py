@@ -25,7 +25,7 @@ import numpy as np
 import optuna
 import pandas as pd
 from optuna_integration.lightgbm import LightGBMPruningCallback
-from sklearn.metrics import log_loss
+from sklearn.metrics import accuracy_score, f1_score, log_loss
 
 from training.config import (
     EARLY_STOPPING_ROUNDS,
@@ -100,10 +100,18 @@ def _objective(
             mlflow.set_tag("pruned", "true")
             raise
 
+        train_probs = model.predict(ds_train.data)
         probs = model.predict(X_val)
+        y_pred = probs.argmax(axis=1)
         val_log_loss = log_loss(y_val, probs, labels=list(range(len(PITCH_TYPES))))
-        mlflow.log_metric("val_log_loss", val_log_loss)
-        mlflow.log_metric("best_iteration", model.best_iteration)
+        mlflow.log_metrics({
+            "val_log_loss": val_log_loss,
+            "val_weighted_f1": f1_score(y_val, y_pred, average="weighted", zero_division=0),
+            "val_accuracy": accuracy_score(y_val, y_pred),
+            "train_log_loss": log_loss(ds_train.label, train_probs, labels=list(range(len(PITCH_TYPES)))),
+            "num_trees": model.num_trees(),
+            "best_iteration": model.best_iteration,
+        })
 
     trial.set_user_attr("best_iteration", model.best_iteration)
     return val_log_loss
