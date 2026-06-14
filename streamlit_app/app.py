@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import requests
 import streamlit as st
+from streamlit_searchbox import st_searchbox
 
 API_URL = "http://localhost:8001"
 
@@ -45,6 +46,7 @@ PITCH_COLORS = {
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
+@st.cache_data(ttl=3600)
 def search_players(query: str, role: str) -> list[dict]:
     if len(query.strip()) < 2:
         return []
@@ -54,6 +56,14 @@ def search_players(query: str, role: str) -> list[dict]:
         return r.json()
     except Exception:
         return []
+
+
+def _search_pitcher(query: str) -> list[tuple[str, dict]]:
+    return [(p["name"], p) for p in search_players(query, "pitcher")]
+
+
+def _search_batter(query: str) -> list[tuple[str, dict]]:
+    return [(p["name"], p) for p in search_players(query, "batter")]
 
 
 def get_prediction(payload: dict) -> dict | None:
@@ -146,15 +156,14 @@ with st.sidebar:
 
     # Pitcher
     st.subheader("Pitcher")
-    pitcher_query = st.text_input("Search pitcher name", placeholder="e.g. Gerrit Cole", key="pitcher_query")
-    pitcher_results = search_players(pitcher_query, "pitcher")
-    if pitcher_results:
-        pitcher_options = {f"{p['name']}  (ID {p['mlbam_id']})": p for p in pitcher_results}
-        selected_pitcher_label = st.selectbox("Select pitcher", list(pitcher_options.keys()), key="pitcher_select")
-        st.session_state.pitcher = pitcher_options[selected_pitcher_label]
-    elif pitcher_query and len(pitcher_query.strip()) >= 2:
-        st.caption("No matches found.")
-
+    pitcher_result = st_searchbox(
+        _search_pitcher,
+        label="Search pitcher name",
+        placeholder="e.g. Gerrit Cole",
+        key="pitcher_searchbox",
+    )
+    if pitcher_result:
+        st.session_state.pitcher = pitcher_result
     if st.session_state.pitcher:
         st.success(f"✓ {st.session_state.pitcher['name']}")
 
@@ -162,15 +171,14 @@ with st.sidebar:
 
     # Batter
     st.subheader("Batter")
-    batter_query = st.text_input("Search batter name", placeholder="e.g. Aaron Judge", key="batter_query")
-    batter_results = search_players(batter_query, "batter")
-    if batter_results:
-        batter_options = {f"{p['name']}  (ID {p['mlbam_id']})": p for p in batter_results}
-        selected_batter_label = st.selectbox("Select batter", list(batter_options.keys()), key="batter_select")
-        st.session_state.batter = batter_options[selected_batter_label]
-    elif batter_query and len(batter_query.strip()) >= 2:
-        st.caption("No matches found.")
-
+    batter_result = st_searchbox(
+        _search_batter,
+        label="Search batter name",
+        placeholder="e.g. Aaron Judge",
+        key="batter_searchbox",
+    )
+    if batter_result:
+        st.session_state.batter = batter_result
     if st.session_state.batter:
         st.success(f"✓ {st.session_state.batter['name']}")
 
