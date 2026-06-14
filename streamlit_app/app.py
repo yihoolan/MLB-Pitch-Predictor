@@ -269,3 +269,65 @@ with col_right:
         st.info("Fill in the game situation and click **Predict Next Pitch**.")
     else:
         _render_prediction_chart(st.session_state.prediction)
+
+
+# ── What-If explorer ──────────────────────────────────────────────────────────
+
+if st.session_state.prediction is not None:
+    with st.expander("What-If: Change the Count", expanded=False):
+        st.caption("Adjust the count to see how the pitch distribution changes vs. your original prediction.")
+
+        wf1, wf2, wf3 = st.columns(3)
+        with wf1:
+            wi_balls = st.select_slider("Balls ", options=[0, 1, 2, 3],
+                                        value=st.session_state.whatif_balls, key="wi_balls")
+            st.markdown("  ".join(["🔵"] * wi_balls + ["⚪"] * (3 - wi_balls)))
+        with wf2:
+            wi_strikes = st.select_slider("Strikes ", options=[0, 1, 2],
+                                          value=st.session_state.whatif_strikes, key="wi_strikes")
+            st.markdown("  ".join(["🔴"] * wi_strikes + ["⚪"] * (2 - wi_strikes)))
+        with wf3:
+            wi_outs = st.select_slider("Outs ", options=[0, 1, 2],
+                                       value=st.session_state.whatif_outs, key="wi_outs")
+            st.markdown("  ".join(["⬛"] * wi_outs + ["⬜"] * (2 - wi_outs)))
+
+        count_changed = (
+            wi_balls != st.session_state.whatif_balls
+            or wi_strikes != st.session_state.whatif_strikes
+            or wi_outs != st.session_state.whatif_outs
+        )
+
+        if count_changed:
+            orig = st.session_state.prediction
+            wi_payload = {
+                "pitcher_mlbam_id": st.session_state.pitcher["mlbam_id"],
+                "pitcher_name": st.session_state.pitcher["name"],
+                "batter_mlbam_id": st.session_state.batter["mlbam_id"],
+                "batter_name": st.session_state.batter["name"],
+                "balls": wi_balls,
+                "strikes": wi_strikes,
+                "outs_when_up": wi_outs,
+                "inning": orig.get("inning", inning),
+                "pitch_number": orig.get("pitch_number", pitch_number),
+                "bat_score_diff": orig.get("bat_score_diff", bat_score_diff),
+                "on_1b": on_1b,
+                "on_2b": on_2b,
+                "on_3b": on_3b,
+                "stand": stand,
+                "p_throws": p_throws,
+            }
+            with st.spinner("Updating…"):
+                wi_result = get_prediction(wi_payload)
+
+            if wi_result:
+                ch1, ch2 = st.columns(2)
+                orig_count = (f"Original  "
+                              f"({st.session_state.whatif_balls}-{st.session_state.whatif_strikes}, "
+                              f"{st.session_state.whatif_outs} out)")
+                wi_count = f"What-If  ({wi_balls}-{wi_strikes}, {wi_outs} out)"
+                with ch1:
+                    st.markdown(f"**{orig_count}**")
+                    _render_prediction_chart(orig)
+                with ch2:
+                    st.markdown(f"**{wi_count}**")
+                    _render_prediction_chart(wi_result)
