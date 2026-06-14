@@ -69,6 +69,7 @@ def _objective(
         "num_class": len(PITCH_TYPES),
         "verbose": -1,
         "seed": RANDOM_STATE,
+        "feature_pre_filter": False,
         "num_leaves": trial.suggest_int("num_leaves", lo, hi),
         "learning_rate": trial.suggest_float("learning_rate", *OPTUNA_PARAM_SPACE["learning_rate"], log=True),
         "min_child_samples": trial.suggest_int("min_child_samples", *OPTUNA_PARAM_SPACE["min_child_samples"]),
@@ -83,17 +84,21 @@ def _objective(
     with mlflow.start_run(run_name=f"trial_{trial.number}", nested=True):
         mlflow.log_params({k: v for k, v in params.items() if k in tunable_keys})
 
-        model = lgb.train(
-            params,
-            ds_train,
-            num_boost_round=N_ESTIMATORS,
-            valid_sets=[ds_val],
-            callbacks=[
-                lgb.early_stopping(EARLY_STOPPING_ROUNDS, verbose=False),
-                lgb.log_evaluation(-1),
-                LightGBMPruningCallback(trial, "multi_logloss"),
-            ],
-        )
+        try:
+            model = lgb.train(
+                params,
+                ds_train,
+                num_boost_round=N_ESTIMATORS,
+                valid_sets=[ds_val],
+                callbacks=[
+                    lgb.early_stopping(EARLY_STOPPING_ROUNDS, verbose=False),
+                    lgb.log_evaluation(-1),
+                    LightGBMPruningCallback(trial, "multi_logloss"),
+                ],
+            )
+        except optuna.exceptions.TrialPruned:
+            mlflow.set_tag("pruned", "true")
+            raise
 
         probs = model.predict(X_val)
         val_log_loss = log_loss(y_val, probs, labels=list(range(len(PITCH_TYPES))))
