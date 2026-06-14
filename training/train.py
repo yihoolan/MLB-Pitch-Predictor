@@ -12,6 +12,9 @@ from __future__ import annotations
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, module="pybaseball")
 
+import pybaseball
+pybaseball.cache.enable()
+
 import argparse
 
 import lightgbm as lgb

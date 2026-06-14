@@ -87,6 +87,17 @@ def build_lgb_datasets(
     if test_df is None:
         test_df = val_df
 
+    # Drop rows whose pitch type isn't in PITCH_TYPES; .map() would silently
+    # produce NaN labels for unknown codes (EP, FA, SC, PO, …), which then
+    # causes sklearn to blow up when computing metrics.
+    for name, df in [("train", train_df), ("val", val_df), ("test", test_df)]:
+        n_unknown = (~df[LABEL_COLUMN].isin(PITCH_TYPES)).sum()
+        if n_unknown:
+            print(f"  [data] dropping {n_unknown} {name} rows with unknown pitch types")
+    train_df = train_df[train_df[LABEL_COLUMN].isin(PITCH_TYPES)]
+    val_df = val_df[val_df[LABEL_COLUMN].isin(PITCH_TYPES)]
+    test_df = test_df[test_df[LABEL_COLUMN].isin(PITCH_TYPES)]
+
     feature_cols = [c for c in MODEL_FEATURES if c in train_df.columns]
     cat_cols = [c for c in _CATEGORICAL_COLS if c in feature_cols]
     num_cols = [c for c in feature_cols if c not in cat_cols]
