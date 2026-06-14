@@ -6,8 +6,10 @@ from pydantic import BaseModel, Field
 
 
 class GameStateRequest(BaseModel):
-    pitcher_name: str = Field(..., description="Pitcher full name, e.g. 'Gerrit Cole'")
-    batter_name: str = Field(..., description="Batter full name, e.g. 'Aaron Judge'")
+    pitcher_mlbam_id: int = Field(..., description="Pitcher MLBAM player ID (from /players search)")
+    pitcher_name: str = Field(..., description="Pitcher display name, echoed back in the response")
+    batter_mlbam_id: int = Field(..., description="Batter MLBAM player ID (from /players search)")
+    batter_name: str = Field(..., description="Batter display name, echoed back in the response")
 
     # Count
     balls: int = Field(..., ge=0, le=3)
