@@ -31,3 +31,86 @@ def load_season(year: int, start_month: int = 4, end_month: int = 9) -> pd.DataF
     end_day = (pd.Timestamp(year, end_month, 1) + pd.offsets.MonthEnd(0)).strftime("%Y-%m-%d")
     raw = statcast(f"{year}-{start_month:02d}-01", end_day)
     return enrich_statcast(raw, prior_year=year - 1)
+
+
+def _preprocess(
+    df: pd.DataFrame,
+    feature_cols: list[str],
+    cat_cols: list[str],
+    num_cols: list[str],
+    *,
+    pitcher_imp: UsageImputer,
+    batter_imp: UsageImputer,
+    num_imp: SimpleImputer,
+    categories: dict[str, list],
+    fit: bool,
+) -> tuple[pd.DataFrame, np.ndarray]:
+    """Apply the full preprocessing chain to one split.
+
+    When fit=True, imputers are fitted on df and categories is populated in place.
+    When fit=False, previously fitted imputers and categories are applied.
+    """
+    work = binarize_bases(df)
+
+    if fit:
+        work = pitcher_imp.fit_transform(work)
+        work = batter_imp.fit_transform(work)
+        imputed_num = num_imp.fit_transform(work[num_cols])
+        for col in cat_cols:
+            categories[col] = sorted(work[col].dropna().unique().tolist())
+    else:
+        work = pitcher_imp.transform(work)
+        work = batter_imp.transform(work)
+        imputed_num = num_imp.transform(work[num_cols])
+
+    work = work.copy()
+    work[num_cols] = imputed_num
+
+    for col in cat_cols:
+        work[col] = pd.Categorical(work[col], categories=categories[col])
+
+    X = work[feature_cols].copy()
+    y = work[LABEL_COLUMN].map(LABEL_ENCODER).to_numpy()
+    return X, y
+
+
+def build_lgb_datasets(
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+    test_df: pd.DataFrame | None = None,
+) -> tuple[lgb.Dataset, lgb.Dataset, pd.DataFrame, np.ndarray, list[str]]:
+    """Preprocess all splits and return (ds_train, ds_val, X_test, y_test, feature_names).
+
+    All imputers are fit exclusively on train_df and applied to val and test.
+    If test_df is None, val_df is reused as the test set (incremental mode).
+    """
+    if test_df is None:
+        test_df = val_df
+
+    feature_cols = [c for c in MODEL_FEATURES if c in train_df.columns]
+    cat_cols = [c for c in _CATEGORICAL_COLS if c in feature_cols]
+    num_cols = [c for c in feature_cols if c not in cat_cols]
+
+    pitcher_imp = UsageImputer(PITCHER_USAGE_COLUMNS, stratify_col="p_throws")
+    batter_imp = UsageImputer(BATTER_USAGE_COLUMNS, stratify_col="stand")
+    num_imp = SimpleImputer(strategy="median")
+    categories: dict[str, list] = {}
+
+    shared = dict(
+        feature_cols=feature_cols,
+        cat_cols=cat_cols,
+        num_cols=num_cols,
+        pitcher_imp=pitcher_imp,
+        batter_imp=batter_imp,
+        num_imp=num_imp,
+        categories=categories,
+    )
+
+    X_train, y_train = _preprocess(train_df, **shared, fit=True)
+    X_val, y_val = _preprocess(val_df, **shared, fit=False)
+    X_test, y_test = _preprocess(test_df, **shared, fit=False)
+
+    ds_train = lgb.Dataset(X_train, label=y_train, categorical_feature=cat_cols, free_raw_data=False)
+    ds_val = lgb.Dataset(X_val, label=y_val, categorical_feature=cat_cols, reference=ds_train, free_raw_data=False)
+
+    return ds_train, ds_val, X_test, y_test, feature_cols
