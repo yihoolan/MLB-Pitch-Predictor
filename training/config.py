@@ -7,13 +7,18 @@ RANDOM_STATE = 42
 LGBM_PARAMS: dict = {
     "objective": "multiclass",
     "num_class": len(PITCH_TYPES),
-    "num_leaves": 63,
-    "min_child_samples": 50,
-    "learning_rate": 0.05,
+    "num_leaves": 124,
+    "min_child_samples": 149,
+    "learning_rate": 0.02191,
+    "feature_fraction": 0.86177,
+    "bagging_fraction": 0.90505,
+    "bagging_freq": 4,
+    "lambda_l1": 0.10535,
+    "lambda_l2": 1.29408,
     "verbose": -1,
     "seed": RANDOM_STATE,
 }
-N_ESTIMATORS = 1000
+N_ESTIMATORS = 883
 EARLY_STOPPING_ROUNDS = 50
 
 ### Data split constants (≈70/15/15 temporal split across years)
