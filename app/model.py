@@ -32,7 +32,7 @@ class ModelRegistry:
                 f"No Production model found in registry '{REGISTERED_MODEL_NAME}'. "
                 "Run `python -m training.train --mode full` first."
             )
-        self.version = versions[0].version
+        self.version = str(versions[0].version)
         uri = f"models:/{REGISTERED_MODEL_NAME}/Production"
         self.model = mlflow.pyfunc.load_model(uri)
 
