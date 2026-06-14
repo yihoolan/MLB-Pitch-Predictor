@@ -13,6 +13,7 @@ from sklearn.metrics import (
     classification_report,
     confusion_matrix,
     f1_score,
+    log_loss,
 )
 
 from utils.feature_names import PITCH_TYPES
@@ -38,6 +39,7 @@ def log_artifacts(
         "accuracy": accuracy_score(y_test, y_pred),
         "macro_f1": f1_score(y_test, y_pred, average="macro", zero_division=0),
         "weighted_f1": f1_score(y_test, y_pred, average="weighted", zero_division=0),
+        "log_loss": log_loss(y_test, probs, labels=list(range(len(PITCH_TYPES)))),
         **{f"f1_{pt}": float(score) for pt, score in zip(PITCH_TYPES, per_class_f1)},
     }
     mlflow.log_metrics(metrics)

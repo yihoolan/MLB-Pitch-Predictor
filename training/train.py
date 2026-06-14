@@ -90,6 +90,7 @@ def run_full() -> None:
             f"  accuracy={metrics['accuracy']:.4f}"
             f"  macro_f1={metrics['macro_f1']:.4f}"
             f"  weighted_f1={metrics['weighted_f1']:.4f}"
+            f"  log_loss={metrics['log_loss']:.4f}"
         )
 
         print(f"Logging model to registry as '{REGISTERED_MODEL_NAME}'...")
@@ -161,6 +162,7 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
             f"  accuracy={metrics['accuracy']:.4f}"
             f"  macro_f1={metrics['macro_f1']:.4f}"
             f"  weighted_f1={metrics['weighted_f1']:.4f}"
+            f"  log_loss={metrics['log_loss']:.4f}"
         )
 
         print(f"Logging updated model to registry as '{REGISTERED_MODEL_NAME}'...")
