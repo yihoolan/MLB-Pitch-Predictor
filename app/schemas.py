@@ -47,6 +47,8 @@ class PlayerMatch(BaseModel):
 
 
 class HealthResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     status: str
     model_version: str | None
     model_loaded: bool
