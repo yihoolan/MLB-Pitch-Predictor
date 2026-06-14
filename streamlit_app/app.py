@@ -69,6 +69,49 @@ def get_prediction(payload: dict) -> dict | None:
         return None
 
 
+def _render_prediction_chart(result: dict, title_suffix: str = "") -> None:
+    """Render a horizontal bar chart of pitch-type probabilities."""
+    import matplotlib.pyplot as plt
+
+    probs = result["probabilities"]
+    # Sort by probability descending; drop pitches below 1%
+    items = sorted(probs.items(), key=lambda x: -x[1])
+    items = [(pt, p) for pt, p in items if p >= 0.01]
+
+    pitch_labels = [f"{PITCH_NAMES.get(pt, pt)} ({pt})" for pt, _ in items]
+    values = [p * 100 for _, p in items]
+    colors = [PITCH_COLORS.get(pt, "#adb5bd") for pt, _ in items]
+
+    fig, ax = plt.subplots(figsize=(6, max(3, len(items) * 0.55)))
+    bars = ax.barh(pitch_labels[::-1], values[::-1], color=colors[::-1], edgecolor="none", height=0.6)
+
+    for bar, val in zip(bars, values[::-1]):
+        ax.text(bar.get_width() + 0.5, bar.get_y() + bar.get_height() / 2,
+                f"{val:.1f}%", va="center", ha="left", fontsize=9)
+
+    ax.set_xlabel("Probability (%)")
+    ax.set_xlim(0, max(values) * 1.18)
+    ax.spines[["top", "right", "left"]].set_visible(False)
+    ax.tick_params(left=False)
+    fig.tight_layout()
+
+    top = result["top_pitch"]
+    top_name = PITCH_NAMES.get(top, top)
+    header = f"Most likely: **{top_name} ({top})** — {probs[top] * 100:.1f}%{title_suffix}"
+    st.markdown(header)
+
+    if result.get("rookie_pitcher") or result.get("rookie_batter"):
+        names = []
+        if result.get("rookie_pitcher"):
+            names.append(result["pitcher_name"])
+        if result.get("rookie_batter"):
+            names.append(result["batter_name"])
+        st.caption(f"⚠️ No prior-year stats found for {', '.join(names)} — using league average.")
+
+    st.pyplot(fig)
+    plt.close(fig)
+
+
 # ── Page config ───────────────────────────────────────────────────────────────
 
 st.set_page_config(
@@ -215,3 +258,14 @@ with col_left:
             st.session_state.whatif_balls = balls
             st.session_state.whatif_strikes = strikes
             st.session_state.whatif_outs = outs
+
+
+# ── Right column: probability chart ──────────────────────────────────────────
+
+with col_right:
+    st.subheader("Prediction")
+
+    if st.session_state.prediction is None:
+        st.info("Fill in the game situation and click **Predict Next Pitch**.")
+    else:
+        _render_prediction_chart(st.session_state.prediction)
