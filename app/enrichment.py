@@ -1,7 +1,8 @@
 """Player name search and prior-year arsenal enrichment.
 
 search_players() does a case-insensitive substring match against the full
-player name using pybaseball's local Chadwick register.
+player name using pybaseball's local Chadwick register, then enriches each
+result with real handedness data from the MLB Stats API.
 
 enrich_row() fetches prior-year pitch_usage stats for a pitcher/batter pair
 and returns a dict of the 20 MODEL_FEATURES usage columns. The full year
@@ -17,6 +18,7 @@ from typing import Literal
 
 import pandas as pd
 import pybaseball
+import requests
 from pybaseball import statcast_batter_pitch_arsenal, statcast_pitcher_arsenal_stats
 from pybaseball.playerid_lookup import get_lookup_table
 
@@ -52,6 +54,35 @@ def _get_register() -> pd.DataFrame:
     return _register
 
 
+# Permanent cache: handedness never changes for a given player.
+_handedness_cache: dict[int, str] = {}
+
+
+def _fetch_handedness(mlbam_ids: list[int], role: Literal["pitcher", "batter"]) -> None:
+    """Populate _handedness_cache for any IDs not already present.
+
+    Makes a single batch request to the MLB Stats API. Falls back silently on
+    network errors, leaving missing IDs absent from the cache (callers use "?").
+    Switch hitters (batSide == "S") are mapped to "R" since the model only
+    supports L/R.
+    """
+    missing = [i for i in mlbam_ids if i not in _handedness_cache]
+    if not missing:
+        return
+    url = (
+        "https://statsapi.mlb.com/api/v1/people"
+        f"?personIds={','.join(str(i) for i in missing)}"
+        "&fields=people,id,pitchHand,batSide"
+    )
+    try:
+        for p in requests.get(url, timeout=5).json().get("people", []):
+            field = "pitchHand" if role == "pitcher" else "batSide"
+            code = (p.get(field) or {}).get("code", "?")
+            _handedness_cache[p["id"]] = "R" if code == "S" else code
+    except Exception:
+        pass
+
+
 def search_players(
     query: str,
     role: Literal["pitcher", "batter"] = "pitcher",
@@ -61,10 +92,11 @@ def search_players(
 
     Splits query into words and keeps rows where every word appears somewhere
     in the player's full name. Returns up to max_results matches, sorted by
-    most recent activity first.
+    most recent activity first, with real handedness populated from the MLB
+    Stats API (cached permanently after the first lookup per player).
 
-    role is passed through to PlayerMatch for display purposes; it does not
-    filter the register (a pitcher/batter distinction isn't in the register).
+    role is passed through to PlayerMatch; it does not filter the register
+    (a pitcher/batter distinction isn't in the Chadwick register).
     """
     register = _get_register()
     q = query.strip().lower()
@@ -77,12 +109,15 @@ def search_players(
         mask &= register["full_name"].str.contains(word, regex=False)
 
     matches = register[mask].sort_values("mlb_played_last", ascending=False).head(max_results)
+    mlbam_ids = [int(row.key_mlbam) for row in matches.itertuples()]
+
+    _fetch_handedness(mlbam_ids, role)
 
     return [
         PlayerMatch(
             name=f"{row.name_first.title()} {row.name_last.title()}",
             mlbam_id=int(row.key_mlbam),
-            throws_or_stands="?",
+            throws_or_stands=_handedness_cache.get(int(row.key_mlbam), "?"),
         )
         for row in matches.itertuples()
     ]
