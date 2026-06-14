@@ -16,8 +16,11 @@ import datetime
 from typing import Literal
 
 import pandas as pd
+import pybaseball
 from pybaseball import statcast_batter_pitch_arsenal, statcast_pitcher_arsenal_stats
 from pybaseball.playerid_lookup import get_lookup_table
+
+pybaseball.cache.enable()
 
 from app.schemas import PlayerMatch
 from utils.feature_names import BATTER_USAGE_COLUMNS, PITCHER_USAGE_COLUMNS
