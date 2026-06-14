@@ -259,34 +259,29 @@ with col_left:
     st.write("")
 
     # Count — clickable circle buttons for balls, strikes, outs
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.write("**Balls**")
-        bcols = st.columns(3)
-        for i in range(1, 4):
-            with bcols[i - 1]:
-                icon = "🔵" if i <= st.session_state.balls else "⚪"
-                if st.button(icon, key=f"ball_{i}"):
-                    st.session_state.balls = i - 1 if st.session_state.balls == i else i
-                    st.rerun()
-    with c2:
-        st.write("**Strikes**")
-        scols = st.columns(2)
-        for i in range(1, 3):
-            with scols[i - 1]:
-                icon = "🟠" if i <= st.session_state.strikes else "⚪"
-                if st.button(icon, key=f"strike_{i}"):
-                    st.session_state.strikes = i - 1 if st.session_state.strikes == i else i
-                    st.rerun()
-    with c3:
-        st.write("**Outs**")
-        ocols = st.columns(2)
-        for i in range(1, 3):
-            with ocols[i - 1]:
-                icon = "🔴" if i <= st.session_state.outs else "⚪"
-                if st.button(icon, key=f"out_{i}"):
-                    st.session_state.outs = i - 1 if st.session_state.outs == i else i
-                    st.rerun()
+    # Labels row
+    lbl_b, lbl_gap1, lbl_s, lbl_gap2, lbl_o, lbl_gap3 = st.columns([3, 1, 2, 1, 2, 3])
+    lbl_b.write("**Balls**")
+    lbl_s.write("**Strikes**")
+    lbl_o.write("**Outs**")
+
+    # Buttons row — flat columns, no nesting
+    b1, b2, b3, _g1, s1, s2, _g2, o1, o2, _g3 = st.columns([1, 1, 1, 1, 1, 1, 1, 1, 1, 3])
+    for col, i in zip([b1, b2, b3], range(1, 4)):
+        icon = "🔵" if i <= st.session_state.balls else "⚪"
+        if col.button(icon, key=f"ball_{i}"):
+            st.session_state.balls = i - 1 if st.session_state.balls == i else i
+            st.rerun()
+    for col, i in zip([s1, s2], range(1, 3)):
+        icon = "🟠" if i <= st.session_state.strikes else "⚪"
+        if col.button(icon, key=f"strike_{i}"):
+            st.session_state.strikes = i - 1 if st.session_state.strikes == i else i
+            st.rerun()
+    for col, i in zip([o1, o2], range(1, 3)):
+        icon = "🔴" if i <= st.session_state.outs else "⚪"
+        if col.button(icon, key=f"out_{i}"):
+            st.session_state.outs = i - 1 if st.session_state.outs == i else i
+            st.rerun()
 
     balls = st.session_state.balls
     strikes = st.session_state.strikes
