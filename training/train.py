@@ -96,3 +96,74 @@ def run_full() -> None:
             registered_model_name=REGISTERED_MODEL_NAME,
         )
         print(f"Run complete: {run.info.run_id}")
+
+
+def run_incremental(new_data_year: int, base_version: int) -> None:
+    """Append new trees on top of an existing registered model using LightGBM init_model.
+
+    Loads the base model from the MLflow registry, trains on new_data_year Apr–Jul,
+    validates on new_data_year Aug–Sep, and registers the updated model as a new version.
+    """
+    print(f"Loading base model '{REGISTERED_MODEL_NAME}' v{base_version} from registry...")
+    model_uri = f"models:/{REGISTERED_MODEL_NAME}/{base_version}"
+    base_model: lgb.Booster = mlflow.lightgbm.load_model(model_uri)
+
+    print(f"Loading {new_data_year} data...")
+    df_new = load_season(new_data_year)
+
+    month = pd.to_datetime(df_new["game_date"]).dt.month
+    train_df = df_new[month <= 7].copy()
+    val_df = df_new[month >= 8].copy()
+
+    print("Building LightGBM datasets...")
+    # No separate test set for incremental runs — evaluate on the held-out val months
+    ds_train, ds_val, X_val, y_val, feature_names = build_lgb_datasets(train_df, val_df)
+
+    mlflow.set_experiment(MLFLOW_EXPERIMENT)
+    with mlflow.start_run() as run:
+        mlflow.set_tags({
+            "training_mode": "incremental",
+            "new_data_year": str(new_data_year),
+            "base_model_version": str(base_version),
+        })
+        mlflow.log_params({
+            **LGBM_PARAMS,
+            "n_estimators_ceiling": N_ESTIMATORS,
+            "early_stopping_rounds": EARLY_STOPPING_ROUNDS,
+            "feature_set": "B",
+            "n_features": len(feature_names),
+            "train_rows": len(train_df),
+            "val_rows": len(val_df),
+            "base_trees": base_model.num_trees(),
+        })
+
+        print(f"Incrementally training from {base_model.num_trees()} existing trees...")
+        model = lgb.train(
+            LGBM_PARAMS,
+            ds_train,
+            num_boost_round=N_ESTIMATORS,
+            valid_sets=[ds_val],
+            init_model=base_model,
+            callbacks=[
+                lgb.early_stopping(EARLY_STOPPING_ROUNDS, verbose=True),
+                lgb.log_evaluation(50),
+            ],
+        )
+        mlflow.log_metric("total_trees", model.num_trees())
+        mlflow.log_metric("new_trees_added", model.num_trees() - base_model.num_trees())
+
+        print("Evaluating on validation set...")
+        metrics = log_artifacts(model, X_val, y_val, feature_names)
+        print(
+            f"  accuracy={metrics['accuracy']:.4f}"
+            f"  macro_f1={metrics['macro_f1']:.4f}"
+            f"  weighted_f1={metrics['weighted_f1']:.4f}"
+        )
+
+        print(f"Logging updated model to registry as '{REGISTERED_MODEL_NAME}'...")
+        mlflow.lightgbm.log_model(
+            model,
+            artifact_path="model",
+            registered_model_name=REGISTERED_MODEL_NAME,
+        )
+        print(f"Run complete: {run.info.run_id}")
