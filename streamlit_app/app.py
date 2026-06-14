@@ -86,8 +86,9 @@ def _render_prediction_chart(result: dict, title_suffix: str = "") -> None:
     bars = ax.barh(pitch_labels[::-1], values[::-1], color=colors[::-1], edgecolor="none", height=0.6)
 
     for bar, val in zip(bars, values[::-1]):
-        ax.text(bar.get_width() + 0.5, bar.get_y() + bar.get_height() / 2,
-                f"{val:.1f}%", va="center", ha="left", fontsize=9)
+        ax.text(
+            bar.get_width() + 0.5, bar.get_y() + bar.get_height() / 2, f"{val:.1f}%", va="center", ha="left", fontsize=9
+        )
 
     ax.set_xlabel("Probability (%)")
     ax.set_xlim(0, max(values) * 1.18)
@@ -127,9 +128,9 @@ st.caption("Predicts the type of the next pitch based on game situation and play
 # ── Session state defaults ────────────────────────────────────────────────────
 
 for key, default in {
-    "pitcher": None,       # selected PlayerMatch dict
-    "batter": None,        # selected PlayerMatch dict
-    "prediction": None,    # last PitchProbabilities response
+    "pitcher": None,  # selected PlayerMatch dict
+    "batter": None,  # selected PlayerMatch dict
+    "prediction": None,  # last PitchProbabilities response
     "whatif_balls": None,
     "whatif_strikes": None,
     "whatif_outs": None,
@@ -222,8 +223,9 @@ with col_left:
     with g1:
         inning = st.number_input("Inning", min_value=1, max_value=15, value=1, step=1)
     with g2:
-        bat_score_diff = st.slider("Score diff", min_value=-10, max_value=10, value=0,
-                                   help="Batting team score minus fielding team score")
+        bat_score_diff = st.slider(
+            "Score diff", min_value=-10, max_value=10, value=0, help="Batting team score minus fielding team score"
+        )
     with g3:
         pitch_number = st.number_input("Pitch in AB", min_value=1, max_value=20, value=1, step=1)
 
@@ -279,16 +281,17 @@ if st.session_state.prediction is not None:
 
         wf1, wf2, wf3 = st.columns(3)
         with wf1:
-            wi_balls = st.select_slider("Balls ", options=[0, 1, 2, 3],
-                                        value=st.session_state.whatif_balls, key="wi_balls")
+            wi_balls = st.select_slider(
+                "Balls ", options=[0, 1, 2, 3], value=st.session_state.whatif_balls, key="wi_balls"
+            )
             st.markdown("  ".join(["🔵"] * wi_balls + ["⚪"] * (3 - wi_balls)))
         with wf2:
-            wi_strikes = st.select_slider("Strikes ", options=[0, 1, 2],
-                                          value=st.session_state.whatif_strikes, key="wi_strikes")
+            wi_strikes = st.select_slider(
+                "Strikes ", options=[0, 1, 2], value=st.session_state.whatif_strikes, key="wi_strikes"
+            )
             st.markdown("  ".join(["🔴"] * wi_strikes + ["⚪"] * (2 - wi_strikes)))
         with wf3:
-            wi_outs = st.select_slider("Outs ", options=[0, 1, 2],
-                                       value=st.session_state.whatif_outs, key="wi_outs")
+            wi_outs = st.select_slider("Outs ", options=[0, 1, 2], value=st.session_state.whatif_outs, key="wi_outs")
             st.markdown("  ".join(["⬛"] * wi_outs + ["⬜"] * (2 - wi_outs)))
 
         count_changed = (
@@ -321,9 +324,11 @@ if st.session_state.prediction is not None:
 
             if wi_result:
                 ch1, ch2 = st.columns(2)
-                orig_count = (f"Original  "
-                              f"({st.session_state.whatif_balls}-{st.session_state.whatif_strikes}, "
-                              f"{st.session_state.whatif_outs} out)")
+                orig_count = (
+                    f"Original  "
+                    f"({st.session_state.whatif_balls}-{st.session_state.whatif_strikes}, "
+                    f"{st.session_state.whatif_outs} out)"
+                )
                 wi_count = f"What-If  ({wi_balls}-{wi_strikes}, {wi_outs} out)"
                 with ch1:
                     st.markdown(f"**{orig_count}**")
