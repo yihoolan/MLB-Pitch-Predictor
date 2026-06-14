@@ -21,7 +21,10 @@ pybaseball.cache.enable()
 
 import lightgbm as lgb
 import mlflow
+import numpy as np
+import optuna
 import pandas as pd
+from optuna_integration.lightgbm import LightGBMPruningCallback
 from sklearn.metrics import log_loss
 
 from training.config import (
@@ -48,11 +51,11 @@ from utils.feature_names import PITCH_TYPES
 
 
 def _objective(
-    trial: "optuna.Trial",
+    trial: optuna.Trial,
     ds_train: lgb.Dataset,
     ds_val: lgb.Dataset,
-    X_val: "pd.DataFrame",
-    y_val: "np.ndarray",
+    X_val: pd.DataFrame,
+    y_val: np.ndarray,
 ) -> float:
     """Optuna objective: train one LightGBM candidate and return val log_loss.
 
@@ -60,10 +63,6 @@ def _objective(
     metrics are browsable under the parent study run in the MLflow UI.
     Uses LightGBMPruningCallback to abandon clearly inferior trials early.
     """
-    import numpy as np
-    import optuna
-    from optuna_integration.lightgbm import LightGBMPruningCallback
-
     lo, hi = OPTUNA_PARAM_SPACE["num_leaves"]
     params = {
         "objective": "multiclass",
@@ -71,9 +70,7 @@ def _objective(
         "verbose": -1,
         "seed": RANDOM_STATE,
         "num_leaves": trial.suggest_int("num_leaves", lo, hi),
-        "learning_rate": trial.suggest_float(
-            "learning_rate", *OPTUNA_PARAM_SPACE["learning_rate"], log=True
-        ),
+        "learning_rate": trial.suggest_float("learning_rate", *OPTUNA_PARAM_SPACE["learning_rate"], log=True),
         "min_child_samples": trial.suggest_int("min_child_samples", *OPTUNA_PARAM_SPACE["min_child_samples"]),
         "feature_fraction": trial.suggest_float("feature_fraction", *OPTUNA_PARAM_SPACE["feature_fraction"]),
         "bagging_fraction": trial.suggest_float("bagging_fraction", *OPTUNA_PARAM_SPACE["bagging_fraction"]),
@@ -124,8 +121,6 @@ def _load_splits() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
 def run_tuning() -> None:
     """Run the full Optuna search, train the final model, register, and auto-promote."""
-    import optuna
-
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     train_df, val_df, test_df = _load_splits()

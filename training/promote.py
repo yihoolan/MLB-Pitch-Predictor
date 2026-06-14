@@ -7,7 +7,6 @@ training/train.py and training/tune.py call this after registering a new version
 
 from __future__ import annotations
 
-import mlflow
 from mlflow.tracking import MlflowClient
 
 from training.config import REGISTERED_MODEL_NAME
@@ -42,8 +41,5 @@ def promote_if_better(new_version: str, new_log_loss: float) -> bool:
         )
         return True
 
-    print(
-        f"  v{new_version} NOT promoted "
-        f"(log_loss {new_log_loss:.4f} >= current {prod_log_loss:.4f})."
-    )
+    print(f"  v{new_version} NOT promoted " f"(log_loss {new_log_loss:.4f} >= current {prod_log_loss:.4f}).")
     return False
