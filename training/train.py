@@ -126,7 +126,7 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
 
     print("Building LightGBM datasets...")
     # No separate test set for incremental runs — evaluate on the held-out val months
-    ds_train, ds_val, X_val, y_val, feature_names = build_lgb_datasets(train_df, val_df)
+    ds_train, ds_val, X_val, y_val, preprocessor = build_lgb_datasets(train_df, val_df)
 
     mlflow.set_experiment(MLFLOW_EXPERIMENT)
     with mlflow.start_run() as run:
@@ -143,7 +143,7 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
                 "n_estimators_ceiling": N_ESTIMATORS,
                 "early_stopping_rounds": EARLY_STOPPING_ROUNDS,
                 "feature_set": "B",
-                "n_features": len(feature_names),
+                "n_features": len(preprocessor.feature_cols),
                 "train_rows": len(train_df),
                 "val_rows": len(val_df),
                 "base_trees": base_model.num_trees(),
@@ -166,7 +166,7 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
         mlflow.log_metric("new_trees_added", model.num_trees() - base_model.num_trees())
 
         print("Evaluating on validation set...")
-        metrics = log_artifacts(model, X_val, y_val, feature_names)
+        metrics = log_artifacts(model, X_val, y_val, preprocessor.feature_cols)
         print(
             f"  weighted_f1={metrics['weighted_f1']:.4f}"
             f"  log_loss={metrics['log_loss']:.4f}"
@@ -175,11 +175,8 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
         )
 
         print(f"Logging updated model to registry as '{REGISTERED_MODEL_NAME}'...")
-        mlflow.lightgbm.log_model(
-            model,
-            artifact_path="model",
-            registered_model_name=REGISTERED_MODEL_NAME,
-        )
+        new_version = log_predictor(model, preprocessor, registered_model_name=REGISTERED_MODEL_NAME)
+        promote_if_better(new_version, metrics["log_loss"])
         print(f"Run complete: {run.info.run_id}")
 
 
