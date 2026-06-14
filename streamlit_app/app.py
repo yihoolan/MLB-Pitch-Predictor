@@ -144,6 +144,10 @@ for key, default in {
     "whatif_balls": None,
     "whatif_strikes": None,
     "whatif_outs": None,
+    "pitcher_id_prev": None,
+    "batter_id_prev": None,
+    "p_throws": "R",
+    "stand": "R",
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -183,6 +187,23 @@ with st.sidebar:
         st.success(f"✓ {st.session_state.batter['name']}")
 
 
+# ── Sync handedness when selected player changes ──────────────────────────────
+
+pitcher_id = st.session_state.pitcher["mlbam_id"] if st.session_state.pitcher else None
+if pitcher_id != st.session_state.pitcher_id_prev:
+    if st.session_state.pitcher:
+        hand = st.session_state.pitcher.get("throws_or_stands", "R")
+        st.session_state.p_throws = hand if hand in ("L", "R") else "R"
+    st.session_state.pitcher_id_prev = pitcher_id
+
+batter_id = st.session_state.batter["mlbam_id"] if st.session_state.batter else None
+if batter_id != st.session_state.batter_id_prev:
+    if st.session_state.batter:
+        hand = st.session_state.batter.get("throws_or_stands", "R")
+        st.session_state.stand = hand if hand in ("L", "R") else "R"
+    st.session_state.batter_id_prev = batter_id
+
+
 # ── Main panel ────────────────────────────────────────────────────────────────
 
 col_left, col_right = st.columns([1, 1], gap="large")
@@ -193,9 +214,9 @@ with col_left:
     # Handedness row
     h_col1, h_col2 = st.columns(2)
     with h_col1:
-        p_throws = st.radio("Pitcher throws", ["R", "L"], horizontal=True)
+        p_throws = st.radio("Pitcher throws", ["R", "L"], horizontal=True, key="p_throws")
     with h_col2:
-        stand = st.radio("Batter stands", ["R", "L"], horizontal=True)
+        stand = st.radio("Batter stands", ["R", "L"], horizontal=True, key="stand")
 
     st.write("")
 
