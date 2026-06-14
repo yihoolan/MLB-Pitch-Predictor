@@ -200,12 +200,18 @@ if pitcher_id != st.session_state.pitcher_id_prev:
         if hand in ("L", "R"):
             st.session_state.p_throws = hand
     st.session_state.pitcher_id_prev = pitcher_id
+    # If the batter is a switch hitter, re-derive their effective stance from the new pitcher hand.
+    if st.session_state.batter and st.session_state.batter.get("throws_or_stands") == "S":
+        st.session_state.stand = "L" if st.session_state.p_throws == "R" else "R"
 
 batter_id = st.session_state.batter["mlbam_id"] if st.session_state.batter else None
 if batter_id != st.session_state.batter_id_prev:
     if st.session_state.batter:
         hand = st.session_state.batter.get("throws_or_stands", "?")
-        if hand in ("L", "R"):
+        if hand == "S":
+            # Switch hitter bats from the side opposite the pitcher's throwing arm.
+            st.session_state.stand = "L" if st.session_state.p_throws == "R" else "R"
+        elif hand in ("L", "R"):
             st.session_state.stand = hand
     st.session_state.batter_id_prev = batter_id
 

@@ -54,17 +54,18 @@ def _get_register() -> pd.DataFrame:
     return _register
 
 
-# Permanent cache: handedness never changes for a given player.
+# Permanent caches: handedness and primary position never change for a given player.
 _handedness_cache: dict[int, str] = {}
+_position_cache: dict[int, str] = {}
 
 
 def _fetch_handedness(mlbam_ids: list[int], role: Literal["pitcher", "batter"]) -> None:
-    """Populate _handedness_cache for any IDs not already present.
+    """Populate _handedness_cache and _position_cache for any IDs not already present.
 
     Makes a single batch request to the MLB Stats API. Falls back silently on
-    network errors, leaving missing IDs absent from the cache (callers use "?").
-    Switch hitters (batSide == "S") are mapped to "R" since the model only
-    supports L/R.
+    network errors, leaving missing IDs absent from the caches (callers use "?").
+    Switch hitters (batSide == "S") are kept as "S" so callers can derive the
+    effective stance from the opposing pitcher's handedness.
     """
     missing = [i for i in mlbam_ids if i not in _handedness_cache]
     if not missing:
@@ -78,7 +79,8 @@ def _fetch_handedness(mlbam_ids: list[int], role: Literal["pitcher", "batter"]) 
         for p in requests.get(url, timeout=5).json().get("people", []):
             field = "pitchHand" if role == "pitcher" else "batSide"
             code = (p.get(field) or {}).get("code", "?")
-            _handedness_cache[p["id"]] = "R" if code == "S" else code
+            _handedness_cache[p["id"]] = code
+            _position_cache[p["id"]] = (p.get("primaryPosition") or {}).get("code", "?")
     except Exception:
         pass
 
@@ -95,8 +97,9 @@ def search_players(
     most recent activity first, with real handedness populated from the MLB
     Stats API (cached permanently after the first lookup per player).
 
-    role is passed through to PlayerMatch; it does not filter the register
-    (a pitcher/batter distinction isn't in the Chadwick register).
+    role is used both to select the correct handedness field (pitchHand vs
+    batSide) and to filter results by primaryPosition.code: pitchers (code "1")
+    for role="pitcher", non-pitchers for role="batter".
     """
     register = _get_register()
     q = query.strip().lower()
@@ -113,14 +116,24 @@ def search_players(
 
     _fetch_handedness(mlbam_ids, role)
 
-    return [
-        PlayerMatch(
-            name=f"{row.name_first.title()} {row.name_last.title()}",
-            mlbam_id=int(row.key_mlbam),
-            throws_or_stands=_handedness_cache.get(int(row.key_mlbam), "?"),
+    results = []
+    for row in matches.itertuples():
+        mid = int(row.key_mlbam)
+        pos = _position_cache.get(mid)
+        # If position is unknown (API miss), include as a fallback rather than silently dropping.
+        if pos is not None and pos != "?":
+            if role == "pitcher" and pos != "1":
+                continue
+            if role == "batter" and pos == "1":
+                continue
+        results.append(
+            PlayerMatch(
+                name=f"{row.name_first.title()} {row.name_last.title()}",
+                mlbam_id=mid,
+                throws_or_stands=_handedness_cache.get(mid, "?"),
+            )
         )
-        for row in matches.itertuples()
-    ]
+    return results
 
 
 # ---------------------------------------------------------------------------
