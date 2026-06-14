@@ -2,6 +2,8 @@
 numpy==1.26.4
 pandas==2.2.3
 scikit-learn==1.5.2
+lightgbm==4.3.0
+matplotlib==3.9.2
 
 ### ----- Data source (also used at inference time for fresh context) -----
 pybaseball==2.2.7
