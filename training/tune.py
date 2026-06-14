@@ -120,3 +120,78 @@ def _load_splits() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     test_df = load_season(TEST_YEAR, start_month=TEST_MONTHS[0], end_month=TEST_MONTHS[1])
 
     return train_df, val_df, test_df
+
+
+def run_tuning() -> None:
+    """Run the full Optuna search, train the final model, register, and auto-promote."""
+    import optuna
+
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+    train_df, val_df, test_df = _load_splits()
+
+    print("Building LightGBM datasets for Optuna search...")
+    ds_train, ds_val, X_val, y_val, _ = build_lgb_datasets(train_df, val_df)
+
+    mlflow.set_experiment(MLFLOW_EXPERIMENT)
+    with mlflow.start_run(run_name=OPTUNA_STUDY_NAME) as parent_run:
+        mlflow.log_param("n_trials", OPTUNA_N_TRIALS)
+
+        print(f"Starting Optuna study ({OPTUNA_N_TRIALS} trials)...")
+        study = optuna.create_study(direction="minimize", study_name=OPTUNA_STUDY_NAME)
+        study.optimize(
+            lambda trial: _objective(trial, ds_train, ds_val, X_val, y_val),
+            n_trials=OPTUNA_N_TRIALS,
+            show_progress_bar=True,
+        )
+
+        best = study.best_trial
+        print(f"Best trial #{best.number}: val_log_loss={best.value:.4f}")
+        print(f"  params: {best.params}")
+        mlflow.log_metric("best_val_log_loss", best.value)
+        mlflow.log_params({f"best_{k}": v for k, v in best.params.items()})
+
+        # Train final model on train+val combined so every labelled example is used
+        print("Training final model on train+val combined...")
+        combined_df = pd.concat([train_df, val_df], ignore_index=True)
+        ds_final, _, X_test, y_test, preprocessor = build_lgb_datasets(combined_df, test_df)
+
+        best_params = {
+            **LGBM_PARAMS,
+            **best.params,
+        }
+        best_n_iters = best.user_attrs.get("best_iteration", N_ESTIMATORS)
+
+        final_model = lgb.train(
+            best_params,
+            ds_final,
+            num_boost_round=best_n_iters,
+            callbacks=[lgb.log_evaluation(50)],
+        )
+
+        print("Evaluating final model on test set...")
+        metrics = log_artifacts(final_model, X_test, y_test, preprocessor.feature_cols)
+        print(
+            f"  weighted_f1={metrics['weighted_f1']:.4f}"
+            f"  log_loss={metrics['log_loss']:.4f}"
+            f"  accuracy={metrics['accuracy']:.4f}"
+            f"  macro_f1={metrics['macro_f1']:.4f}"
+        )
+        mlflow.log_params(
+            {
+                **best_params,
+                "n_features": len(preprocessor.feature_cols),
+                "train_rows": len(combined_df),
+                "test_rows": len(test_df),
+                "final_n_estimators": best_n_iters,
+            }
+        )
+
+        print(f"Registering final model as '{REGISTERED_MODEL_NAME}'...")
+        new_version = log_predictor(final_model, preprocessor, registered_model_name=REGISTERED_MODEL_NAME)
+        promote_if_better(new_version, metrics["log_loss"])
+        print(f"Tuning run complete: {parent_run.info.run_id}")
+
+
+if __name__ == "__main__":
+    run_tuning()
