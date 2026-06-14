@@ -25,3 +25,18 @@ VAL_YEAR = 2024
 VAL_MONTHS = (8, 9)
 TEST_YEAR = 2025
 TEST_MONTHS = (4, 5)
+
+### Optuna hyperparameter search
+OPTUNA_N_TRIALS = 60
+OPTUNA_STUDY_NAME = "lgbm_pitch_type"
+### Each value is (low, high); learning_rate uses log scale in the sampler
+OPTUNA_PARAM_SPACE: dict[str, tuple] = {
+    "num_leaves": (31, 255),
+    "learning_rate": (0.01, 0.3),
+    "min_child_samples": (20, 200),
+    "feature_fraction": (0.5, 1.0),
+    "bagging_fraction": (0.5, 1.0),
+    "bagging_freq": (1, 7),
+    "lambda_l1": (0.0, 10.0),
+    "lambda_l2": (0.0, 10.0),
+}
