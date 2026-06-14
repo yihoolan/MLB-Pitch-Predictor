@@ -167,3 +167,25 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
             registered_model_name=REGISTERED_MODEL_NAME,
         )
         print(f"Run complete: {run.info.run_id}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Train the MLB pitch-type LightGBM classifier.")
+    parser.add_argument("--mode", choices=["full", "incremental"], default="full",
+                        help="full: train from scratch; incremental: extend an existing model")
+    parser.add_argument("--new-data-year", type=int, default=None,
+                        help="[incremental] Year of new season data to train on")
+    parser.add_argument("--base-version", type=int, default=None,
+                        help="[incremental] MLflow registry version of the base model")
+    args = parser.parse_args()
+
+    if args.mode == "incremental":
+        if args.new_data_year is None or args.base_version is None:
+            parser.error("--new-data-year and --base-version are required for incremental mode")
+        run_incremental(args.new_data_year, args.base_version)
+    else:
+        run_full()
+
+
+if __name__ == "__main__":
+    main()
