@@ -131,6 +131,11 @@ def search_players(
 # for that prior year so we only pay the pybaseball download cost once.
 _arsenal_cache: dict[int, tuple[pd.DataFrame, pd.DataFrame]] = {}
 
+# Cache keyed by (pitcher_mlbam, batter_mlbam, year); player stats for a given
+# year are fixed, so no TTL is needed. Avoids repeated DataFrame filters on
+# every POST /predict (most useful for the What-If explorer).
+_enrich_cache: dict[tuple[int, int, int], tuple[dict, bool, bool]] = {}
+
 
 def _current_prior_year() -> int:
     return datetime.datetime.now().year - 1
@@ -173,9 +178,12 @@ def enrich_row(
     """Return usage feature dict for a pitcher/batter pair for inference.
 
     Fetches the full prior-year arsenal tables (cached after first call) and
-    looks up each player by MLBAM ID. Players with no prior-year row (rookies)
-    get NaN for all their usage columns; the model's saved UsageImputer handles
-    those with the training-time stratified global median.
+    looks up each player by MLBAM ID. Results are cached per (pitcher, batter,
+    year) so repeated calls with the same pair (e.g. What-If explorer) are free.
+
+    Players with no prior-year row (rookies) get NaN for all their usage columns;
+    the model's saved UsageImputer handles those with the training-time stratified
+    global median.
 
     Returns:
         usage_dict     — dict mapping all 20 usage column names to float or NaN
@@ -183,6 +191,10 @@ def enrich_row(
         rookie_batter  — True if batter had no prior-year stats
     """
     year = prior_year or _current_prior_year()
+    key = (pitcher_mlbam, batter_mlbam, year)
+    if key in _enrich_cache:
+        return _enrich_cache[key]
+
     pit_wide, bat_wide = _get_arsenal_tables(year)
 
     pit_row = pit_wide[pit_wide["player_id"] == pitcher_mlbam]
@@ -197,4 +209,6 @@ def enrich_row(
     for col in BATTER_USAGE_COLUMNS:
         usage[col] = None if rookie_batter else bat_row.iloc[0][col]
 
-    return usage, rookie_pitcher, rookie_batter
+    result = (usage, rookie_pitcher, rookie_batter)
+    _enrich_cache[key] = result
+    return result
