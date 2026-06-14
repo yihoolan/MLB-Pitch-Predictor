@@ -1,0 +1,40 @@
+name: Monthly Incremental Training
+
+on:
+  schedule:
+    # Runs at 09:00 UTC on the 1st of every month.
+    # If the self-hosted runner is offline when this fires, GitHub will queue
+    # the job for up to 6 hours.  Use workflow_dispatch to rerun manually.
+    - cron: "0 9 1 * *"
+  workflow_dispatch:
+    inputs:
+      new_data_year:
+        description: "Year of season data to train on (leave blank to auto-detect)"
+        required: false
+      base_version:
+        description: "Registry version of the base model (leave blank to auto-detect Production)"
+        required: false
+
+jobs:
+  incremental-train:
+    runs-on: self-hosted
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt --quiet
+
+      - name: Resolve Production version from local MLflow registry
+        id: registry
+        # Only auto-detect when the caller didn't supply explicit inputs
+        if: ${{ !inputs.new_data_year || !inputs.base_version }}
+        run: python scripts/get_production_version.py
+
+      - name: Run incremental training
+        run: |
+          python -m training.train \
+            --mode incremental \
+            --new-data-year ${{ inputs.new_data_year || steps.registry.outputs.next_year }} \
+            --base-version ${{ inputs.base_version || steps.registry.outputs.prod_version }}
