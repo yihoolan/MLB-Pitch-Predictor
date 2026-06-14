@@ -41,26 +41,20 @@ docker build -t mlb-pitch-predictor .
 docker compose up
 ```
 
-## Planned repo layout
-
-Not all of these directories exist yet — they will be created as the project progresses.
+## Repo layout
 
 ```
 MLB-Pitch-Predictor/
 ├── exploration/        # Jupyter notebooks: EDA, feature engineering, model selection
-├── src/                # Modularized training & feature code (refactored out of notebooks)
+├── training/           # LightGBM training, tuning, evaluation, and MLflow registration
 ├── app/                # FastAPI prediction service
-├── streamlit_app/      # Streamlit UI that calls the FastAPI service
-├── models/             # Serialized model artifacts (gitignored)
+│   └── routers/        # Route handlers for /players and /predict
+├── streamlit_app/      # Streamlit UI — calls the FastAPI service over HTTP
+├── utils/              # Shared feature definitions and preprocessing transforms
+├── scripts/            # Utility scripts for CI/CD workflows
 ├── data/               # Raw / processed Statcast data (gitignored)
-├── tests/              # pytest suite
+├── mlruns/             # MLflow experiment tracking and model registry (gitignored)
 ├── requirements.txt        # Runtime dependencies (what ships in the container)
 ├── requirements-dev.txt    # Dev superset: runtime + Jupyter + plotting + lint/test/hooks
 └── README.md
 ```
-
-## Roadmap
-
-1. **Exploration** — `pybaseball` data pulls, EDA, feature engineering, and model selection in Jupyter notebooks under `exploration/`.
-2. **Modularization** — Lift the chosen training pipeline out of notebooks into `src/`, with proper interfaces and tests.
-3. **Deployment** — Wrap the trained model in a FastAPI service, build a Streamlit frontend, containerize both with Docker, track experiments and model versions with MLflow, and wire up GitHub Actions for CI/CD. Optional AWS hosting last.
