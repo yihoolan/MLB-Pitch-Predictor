@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import requests
 import streamlit as st
-from streamlit_searchbox import st_searchbox
 
 API_URL = "http://localhost:8001"
 
@@ -57,13 +56,6 @@ def search_players(query: str, role: str) -> list[dict]:
     except Exception:
         return []
 
-
-def _search_pitcher(query: str) -> list[tuple[str, dict]]:
-    return [(p["name"], p) for p in search_players(query, "pitcher")]
-
-
-def _search_batter(query: str) -> list[tuple[str, dict]]:
-    return [(p["name"], p) for p in search_players(query, "batter")]
 
 
 def get_prediction(payload: dict) -> dict | None:
@@ -160,14 +152,20 @@ with st.sidebar:
 
     # Pitcher
     st.subheader("Pitcher")
-    pitcher_result = st_searchbox(
-        _search_pitcher,
-        label="Search pitcher name",
-        placeholder="e.g. Gerrit Cole",
-        key="pitcher_searchbox",
-    )
-    if pitcher_result:
-        st.session_state.pitcher = pitcher_result
+    pitcher_query = st.text_input("Search pitcher name", placeholder="e.g. Gerrit Cole", key="pitcher_query")
+    pitcher_results = search_players(pitcher_query, "pitcher")
+    if len(pitcher_results) == 1:
+        st.session_state.pitcher = pitcher_results[0]
+    elif len(pitcher_results) > 1:
+        pitcher_options = {p["name"]: p for p in pitcher_results}
+        selected = st.selectbox(
+            "Select pitcher", list(pitcher_options.keys()),
+            index=None, placeholder="Choose a pitcher…", key="pitcher_select",
+        )
+        if selected:
+            st.session_state.pitcher = pitcher_options[selected]
+    elif pitcher_query and len(pitcher_query.strip()) >= 2:
+        st.caption("No matches found.")
     if st.session_state.pitcher:
         st.success(f"✓ {st.session_state.pitcher['name']}")
 
@@ -175,14 +173,20 @@ with st.sidebar:
 
     # Batter
     st.subheader("Batter")
-    batter_result = st_searchbox(
-        _search_batter,
-        label="Search batter name",
-        placeholder="e.g. Aaron Judge",
-        key="batter_searchbox",
-    )
-    if batter_result:
-        st.session_state.batter = batter_result
+    batter_query = st.text_input("Search batter name", placeholder="e.g. Aaron Judge", key="batter_query")
+    batter_results = search_players(batter_query, "batter")
+    if len(batter_results) == 1:
+        st.session_state.batter = batter_results[0]
+    elif len(batter_results) > 1:
+        batter_options = {p["name"]: p for p in batter_results}
+        selected = st.selectbox(
+            "Select batter", list(batter_options.keys()),
+            index=None, placeholder="Choose a batter…", key="batter_select",
+        )
+        if selected:
+            st.session_state.batter = batter_options[selected]
+    elif batter_query and len(batter_query.strip()) >= 2:
+        st.caption("No matches found.")
     if st.session_state.batter:
         st.success(f"✓ {st.session_state.batter['name']}")
 
