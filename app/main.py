@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.enrichment import _current_prior_year, _get_arsenal_tables
 from app.model import model_registry
 from app.routers import players, predict
 from app.schemas import HealthResponse
@@ -24,6 +25,7 @@ from app.schemas import HealthResponse
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     model_registry.load_production()
+    _get_arsenal_tables(_current_prior_year())
     yield
 
 
