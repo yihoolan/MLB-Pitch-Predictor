@@ -7,19 +7,21 @@ Usage:
     # Incremental training: append new trees on top of an existing registered model
     python -m training.train --mode incremental --new-data-year 2025 --base-version 1
 """
+
 from __future__ import annotations
 
 import warnings
+
 warnings.filterwarnings("ignore", category=FutureWarning, module="pybaseball")
 
 import pybaseball
+
 pybaseball.cache.enable()
 
 import argparse
 
 import lightgbm as lgb
 import mlflow
-import mlflow.lightgbm
 import pandas as pd
 
 from training.config import (
@@ -36,6 +38,8 @@ from training.config import (
 )
 from training.data import build_lgb_datasets, load_season
 from training.evaluate import log_artifacts
+from training.predictor import log_predictor
+from training.promote import promote_if_better
 
 
 def run_full() -> None:
@@ -51,26 +55,30 @@ def run_full() -> None:
     test_df = load_season(TEST_YEAR, start_month=TEST_MONTHS[0], end_month=TEST_MONTHS[1])
 
     print("Building LightGBM datasets...")
-    ds_train, ds_val, X_test, y_test, feature_names = build_lgb_datasets(train_df, val_df, test_df)
+    ds_train, ds_val, X_test, y_test, preprocessor = build_lgb_datasets(train_df, val_df, test_df)
 
     mlflow.set_experiment(MLFLOW_EXPERIMENT)
     with mlflow.start_run() as run:
-        mlflow.set_tags({
-            "training_mode": "full",
-            "train_years": "-".join(str(y) for y in TRAIN_END_MONTH),
-            "val": f"{VAL_YEAR}-{VAL_MONTHS[0]:02d}-{VAL_MONTHS[1]:02d}",
-            "test": f"{TEST_YEAR}-{TEST_MONTHS[0]:02d}-{TEST_MONTHS[1]:02d}",
-        })
-        mlflow.log_params({
-            **LGBM_PARAMS,
-            "n_estimators_ceiling": N_ESTIMATORS,
-            "early_stopping_rounds": EARLY_STOPPING_ROUNDS,
-            "feature_set": "B",
-            "n_features": len(feature_names),
-            "train_rows": len(train_df),
-            "val_rows": len(val_df),
-            "test_rows": len(test_df),
-        })
+        mlflow.set_tags(
+            {
+                "training_mode": "full",
+                "train_years": "-".join(str(y) for y in TRAIN_END_MONTH),
+                "val": f"{VAL_YEAR}-{VAL_MONTHS[0]:02d}-{VAL_MONTHS[1]:02d}",
+                "test": f"{TEST_YEAR}-{TEST_MONTHS[0]:02d}-{TEST_MONTHS[1]:02d}",
+            }
+        )
+        mlflow.log_params(
+            {
+                **LGBM_PARAMS,
+                "n_estimators_ceiling": N_ESTIMATORS,
+                "early_stopping_rounds": EARLY_STOPPING_ROUNDS,
+                "feature_set": "B",
+                "n_features": len(preprocessor.feature_cols),
+                "train_rows": len(train_df),
+                "val_rows": len(val_df),
+                "test_rows": len(test_df),
+            }
+        )
 
         print("Training LightGBM...")
         model = lgb.train(
@@ -85,7 +93,7 @@ def run_full() -> None:
         )
 
         print("Evaluating on test set...")
-        metrics = log_artifacts(model, X_test, y_test, feature_names)
+        metrics = log_artifacts(model, X_test, y_test, preprocessor.feature_cols)
         print(
             f"  weighted_f1={metrics['weighted_f1']:.4f}"
             f"  log_loss={metrics['log_loss']:.4f}"
@@ -94,11 +102,8 @@ def run_full() -> None:
         )
 
         print(f"Logging model to registry as '{REGISTERED_MODEL_NAME}'...")
-        mlflow.lightgbm.log_model(
-            model,
-            artifact_path="model",
-            registered_model_name=REGISTERED_MODEL_NAME,
-        )
+        new_version = log_predictor(model, preprocessor, registered_model_name=REGISTERED_MODEL_NAME)
+        promote_if_better(new_version, metrics["log_loss"])
         print(f"Run complete: {run.info.run_id}")
 
 
@@ -125,21 +130,25 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
 
     mlflow.set_experiment(MLFLOW_EXPERIMENT)
     with mlflow.start_run() as run:
-        mlflow.set_tags({
-            "training_mode": "incremental",
-            "new_data_year": str(new_data_year),
-            "base_model_version": str(base_version),
-        })
-        mlflow.log_params({
-            **LGBM_PARAMS,
-            "n_estimators_ceiling": N_ESTIMATORS,
-            "early_stopping_rounds": EARLY_STOPPING_ROUNDS,
-            "feature_set": "B",
-            "n_features": len(feature_names),
-            "train_rows": len(train_df),
-            "val_rows": len(val_df),
-            "base_trees": base_model.num_trees(),
-        })
+        mlflow.set_tags(
+            {
+                "training_mode": "incremental",
+                "new_data_year": str(new_data_year),
+                "base_model_version": str(base_version),
+            }
+        )
+        mlflow.log_params(
+            {
+                **LGBM_PARAMS,
+                "n_estimators_ceiling": N_ESTIMATORS,
+                "early_stopping_rounds": EARLY_STOPPING_ROUNDS,
+                "feature_set": "B",
+                "n_features": len(feature_names),
+                "train_rows": len(train_df),
+                "val_rows": len(val_df),
+                "base_trees": base_model.num_trees(),
+            }
+        )
 
         print(f"Incrementally training from {base_model.num_trees()} existing trees...")
         model = lgb.train(
@@ -176,12 +185,18 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train the MLB pitch-type LightGBM classifier.")
-    parser.add_argument("--mode", choices=["full", "incremental"], default="full",
-                        help="full: train from scratch; incremental: extend an existing model")
-    parser.add_argument("--new-data-year", type=int, default=None,
-                        help="[incremental] Year of new season data to train on")
-    parser.add_argument("--base-version", type=int, default=None,
-                        help="[incremental] MLflow registry version of the base model")
+    parser.add_argument(
+        "--mode",
+        choices=["full", "incremental"],
+        default="full",
+        help="full: train from scratch; incremental: extend an existing model",
+    )
+    parser.add_argument(
+        "--new-data-year", type=int, default=None, help="[incremental] Year of new season data to train on"
+    )
+    parser.add_argument(
+        "--base-version", type=int, default=None, help="[incremental] MLflow registry version of the base model"
+    )
     args = parser.parse_args()
 
     if args.mode == "incremental":
