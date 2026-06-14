@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
 import pandas as pd
+from sklearn.calibration import calibration_curve
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
@@ -17,6 +18,8 @@ from sklearn.metrics import (
 )
 
 from utils.feature_names import PITCH_TYPES
+
+CALIBRATION_CLASSES = ["FF", "SI", "SL", "CH", "FC", "CU"]
 
 
 def log_artifacts(
@@ -49,6 +52,7 @@ def log_artifacts(
         _write_classification_report(y_test, y_pred, tmp)
         _plot_feature_importance(model, feature_names, tmp)
         _plot_per_class_f1(metrics, tmp)
+        _plot_calibration(y_test, probs, tmp)
         mlflow.log_artifacts(tmp, artifact_path="eval")
 
     return metrics
@@ -140,4 +144,21 @@ def _plot_per_class_f1(metrics: dict[str, float], out_dir: str) -> None:
 
     fig.tight_layout()
     fig.savefig(Path(out_dir) / "per_class_f1.png", dpi=120)
+    plt.close(fig)
+
+
+def _plot_calibration(y_test: np.ndarray, probs: np.ndarray, out_dir: str) -> None:
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.plot([0, 1], [0, 1], "k--", linewidth=1, label="perfect")
+    for pt in CALIBRATION_CLASSES:
+        idx = PITCH_TYPES.index(pt)
+        binary_y = (y_test == idx).astype(int)
+        frac_pos, mean_pred = calibration_curve(binary_y, probs[:, idx], n_bins=10)
+        ax.plot(mean_pred, frac_pos, marker="o", label=pt)
+    ax.set_xlabel("Mean predicted probability")
+    ax.set_ylabel("Fraction of positives")
+    ax.set_title("Calibration curves")
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    fig.savefig(Path(out_dir) / "calibration.png", dpi=120)
     plt.close(fig)
