@@ -140,6 +140,9 @@ for key, default in {
     "batter_id_prev": None,
     "p_throws": "R",
     "stand": "R",
+    "balls": 0,
+    "strikes": 0,
+    "outs": 0,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -223,6 +226,29 @@ col_left, col_right = st.columns([1, 1], gap="large")
 with col_left:
     st.subheader("Game Situation")
 
+    # Minimal styling so circle buttons look like plain icons
+    st.markdown(
+        """
+        <style>
+        [data-testid="stBaseButton-secondary"] {
+            background: transparent;
+            border: none;
+            font-size: 1.6rem;
+            padding: 2px 4px;
+            min-height: 0;
+            line-height: 1;
+            box-shadow: none;
+        }
+        [data-testid="stBaseButton-secondary"]:hover {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     # Handedness row
     h_col1, h_col2 = st.columns(2)
     with h_col1:
@@ -232,17 +258,39 @@ with col_left:
 
     st.write("")
 
-    # Count — balls, strikes, outs with progressive dot display
+    # Count — clickable circle buttons for balls, strikes, outs
     c1, c2, c3 = st.columns(3)
     with c1:
-        balls = st.select_slider("Balls", options=[0, 1, 2, 3], value=0)
-        st.markdown("  ".join(["🔵"] * balls + ["⚪"] * (3 - balls)))
+        st.write("**Balls**")
+        bcols = st.columns(3)
+        for i in range(1, 4):
+            with bcols[i - 1]:
+                icon = "🔵" if i <= st.session_state.balls else "⚪"
+                if st.button(icon, key=f"ball_{i}"):
+                    st.session_state.balls = i - 1 if st.session_state.balls == i else i
+                    st.rerun()
     with c2:
-        strikes = st.select_slider("Strikes", options=[0, 1, 2], value=0)
-        st.markdown("  ".join(["🔴"] * strikes + ["⚪"] * (2 - strikes)))
+        st.write("**Strikes**")
+        scols = st.columns(2)
+        for i in range(1, 3):
+            with scols[i - 1]:
+                icon = "🟠" if i <= st.session_state.strikes else "⚪"
+                if st.button(icon, key=f"strike_{i}"):
+                    st.session_state.strikes = i - 1 if st.session_state.strikes == i else i
+                    st.rerun()
     with c3:
-        outs = st.select_slider("Outs", options=[0, 1, 2], value=0)
-        st.markdown("  ".join(["⬛"] * outs + ["⬜"] * (2 - outs)))
+        st.write("**Outs**")
+        ocols = st.columns(2)
+        for i in range(1, 3):
+            with ocols[i - 1]:
+                icon = "🔴" if i <= st.session_state.outs else "⚪"
+                if st.button(icon, key=f"out_{i}"):
+                    st.session_state.outs = i - 1 if st.session_state.outs == i else i
+                    st.rerun()
+
+    balls = st.session_state.balls
+    strikes = st.session_state.strikes
+    outs = st.session_state.outs
 
     st.write("")
 
@@ -268,7 +316,7 @@ with col_left:
             "Score diff", min_value=-10, max_value=10, value=0, help="Batting team score minus fielding team score"
         )
     with g3:
-        pitch_number = st.number_input("Pitch in AB", min_value=1, max_value=20, value=1, step=1)
+        pitch_number = st.number_input("Pitch in AB", min_value=1, max_value=20, value=min(balls + strikes + 1, 20), step=1)
 
     # Predict button
     st.write("")
@@ -330,10 +378,10 @@ if st.session_state.prediction is not None:
             wi_strikes = st.select_slider(
                 "Strikes ", options=[0, 1, 2], value=st.session_state.whatif_strikes, key="wi_strikes"
             )
-            st.markdown("  ".join(["🔴"] * wi_strikes + ["⚪"] * (2 - wi_strikes)))
+            st.markdown("  ".join(["🟠"] * wi_strikes + ["⚪"] * (2 - wi_strikes)))
         with wf3:
             wi_outs = st.select_slider("Outs ", options=[0, 1, 2], value=st.session_state.whatif_outs, key="wi_outs")
-            st.markdown("  ".join(["⬛"] * wi_outs + ["⬜"] * (2 - wi_outs)))
+            st.markdown("  ".join(["🔴"] * wi_outs + ["⚪"] * (2 - wi_outs)))
 
         count_changed = (
             wi_balls != st.session_state.whatif_balls
