@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import dataclasses
+
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
@@ -17,6 +19,23 @@ from utils.feature_names import (
 from utils.transforms import UsageImputer, binarize_bases
 
 _CATEGORICAL_COLS = ["stand", "p_throws"]
+
+
+@dataclasses.dataclass
+class Preprocessor:
+    """All fitted preprocessing state needed to transform raw inference input.
+
+    Picklable — serialized alongside the booster so inference requires no refitting.
+    """
+
+    pitcher_imp: object  # UsageImputer — typed as object to avoid circular imports
+    batter_imp: object
+    num_imp: SimpleImputer
+    categories: dict[str, list]
+    feature_cols: list[str]
+    cat_cols: list[str]
+    num_cols: list[str]
+
 
 ### Fixed label encoding — index matches LightGBM's internal class ordering
 LABEL_ENCODER: dict[str, int] = {pt: i for i, pt in enumerate(PITCH_TYPES)}
@@ -78,11 +97,13 @@ def build_lgb_datasets(
     train_df: pd.DataFrame,
     val_df: pd.DataFrame,
     test_df: pd.DataFrame | None = None,
-) -> tuple[lgb.Dataset, lgb.Dataset, pd.DataFrame, np.ndarray, list[str]]:
-    """Preprocess all splits and return (ds_train, ds_val, X_test, y_test, feature_names).
+) -> tuple[lgb.Dataset, lgb.Dataset, pd.DataFrame, np.ndarray, Preprocessor]:
+    """Preprocess all splits and return (ds_train, ds_val, X_test, y_test, preprocessor).
 
     All imputers are fit exclusively on train_df and applied to val and test.
     If test_df is None, val_df is reused as the test set (incremental mode).
+    The returned Preprocessor holds all fitted state needed for inference — pickle
+    it alongside the booster so serving never needs to refit from training data.
     """
     if test_df is None:
         test_df = val_df
@@ -121,7 +142,17 @@ def build_lgb_datasets(
     X_val, y_val = _preprocess(val_df, **shared, fit=False)
     X_test, y_test = _preprocess(test_df, **shared, fit=False)
 
+    preprocessor = Preprocessor(
+        pitcher_imp=pitcher_imp,
+        batter_imp=batter_imp,
+        num_imp=num_imp,
+        categories=categories,
+        feature_cols=feature_cols,
+        cat_cols=cat_cols,
+        num_cols=num_cols,
+    )
+
     ds_train = lgb.Dataset(X_train, label=y_train, categorical_feature=cat_cols, free_raw_data=False)
     ds_val = lgb.Dataset(X_val, label=y_val, categorical_feature=cat_cols, reference=ds_train, free_raw_data=False)
 
-    return ds_train, ds_val, X_test, y_test, feature_cols
+    return ds_train, ds_val, X_test, y_test, preprocessor
