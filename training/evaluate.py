@@ -18,6 +18,40 @@ from sklearn.metrics import (
 from utils.feature_names import PITCH_TYPES
 
 
+def log_artifacts(
+    model: lgb.Booster,
+    X_test: pd.DataFrame,
+    y_test: np.ndarray,
+    feature_names: list[str],
+) -> dict[str, float]:
+    """Compute evaluation metrics, log all artifacts to the active MLflow run.
+
+    Logs scalar metrics directly and saves confusion matrix, classification report,
+    feature importance, and per-class F1 chart as MLflow artifacts under 'eval/'.
+    Returns the scalar metrics dict.
+    """
+    probs = model.predict(X_test)
+    y_pred = probs.argmax(axis=1)
+
+    per_class_f1 = f1_score(y_test, y_pred, average=None, zero_division=0, labels=list(range(len(PITCH_TYPES))))
+    metrics: dict[str, float] = {
+        "accuracy": accuracy_score(y_test, y_pred),
+        "macro_f1": f1_score(y_test, y_pred, average="macro", zero_division=0),
+        "weighted_f1": f1_score(y_test, y_pred, average="weighted", zero_division=0),
+        **{f"f1_{pt}": float(score) for pt, score in zip(PITCH_TYPES, per_class_f1)},
+    }
+    mlflow.log_metrics(metrics)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _plot_confusion_matrix(y_test, y_pred, tmp)
+        _write_classification_report(y_test, y_pred, tmp)
+        _plot_feature_importance(model, feature_names, tmp)
+        _plot_per_class_f1(metrics, tmp)
+        mlflow.log_artifacts(tmp, artifact_path="eval")
+
+    return metrics
+
+
 def _plot_confusion_matrix(y_test: np.ndarray, y_pred: np.ndarray, out_dir: str) -> None:
     labels = list(range(len(PITCH_TYPES)))
     cm = confusion_matrix(y_test, y_pred, labels=labels, normalize="true")
