@@ -12,34 +12,36 @@ from mlflow.tracking import MlflowClient
 from training.config import REGISTERED_MODEL_NAME
 
 
-def promote_if_better(new_version: str, new_log_loss: float) -> bool:
+def promote_if_better(new_version: str, new_log_loss: float, prod_log_loss: float | None) -> bool:
     """Promote new_version to Production if its log_loss beats the current champion.
 
-    - If no Production model exists yet, promotes unconditionally.
-    - If a Production model exists and new_log_loss is lower, archives the old
-      version and promotes the new one.
+    prod_log_loss must be computed by the caller on the same test slice used to
+    evaluate new_version — this ensures a fair apples-to-apples comparison rather
+    than comparing against a stale metric from a different dataset.
+
+    - If prod_log_loss is None (no Production model, or load failed), promotes unconditionally.
+    - If new_log_loss < prod_log_loss, archives the old version and promotes the new one.
     - Returns True if a promotion occurred, False otherwise.
     """
     client = MlflowClient()
-    prod = client.get_latest_versions(REGISTERED_MODEL_NAME, stages=["Production"])
 
-    if not prod:
+    if prod_log_loss is None:
         client.transition_model_version_stage(REGISTERED_MODEL_NAME, new_version, "Production")
-        print(f"  No prior Production model — promoted v{new_version} directly.")
+        print(f"  No Production baseline — promoted v{new_version} directly.")
         return True
 
-    prod_version = prod[0]
-    prod_log_loss = float(client.get_run(prod_version.run_id).data.metrics["log_loss"])
+    prod = client.get_latest_versions(REGISTERED_MODEL_NAME, stages=["Production"])
 
     if new_log_loss < prod_log_loss:
-        client.transition_model_version_stage(REGISTERED_MODEL_NAME, prod_version.version, "Archived")
+        if prod:
+            client.transition_model_version_stage(REGISTERED_MODEL_NAME, prod[0].version, "Archived")
         client.transition_model_version_stage(REGISTERED_MODEL_NAME, new_version, "Production")
         print(
             f"  Promoted v{new_version} to Production "
             f"(log_loss {new_log_loss:.4f} < {prod_log_loss:.4f}). "
-            f"Archived v{prod_version.version}."
+            f"Archived v{prod[0].version}."
         )
         return True
 
-    print(f"  v{new_version} NOT promoted " f"(log_loss {new_log_loss:.4f} >= current {prod_log_loss:.4f}).")
+    print(f"  v{new_version} NOT promoted (log_loss {new_log_loss:.4f} >= current {prod_log_loss:.4f}).")
     return False
