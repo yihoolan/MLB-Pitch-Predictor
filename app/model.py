@@ -7,10 +7,14 @@ the server process.
 
 from __future__ import annotations
 
+import logging
+
 import mlflow.pyfunc
 from mlflow.tracking import MlflowClient
 
 from settings import settings
+
+logger = logging.getLogger(__name__)
 
 
 class ModelRegistry:
@@ -33,8 +37,10 @@ class ModelRegistry:
                 "Run `python -m training.train --mode full` first."
             )
         self.version = str(versions[0].version)
+        logger.info("Loading Production model version %s", self.version)
         uri = f"models:/{settings.registered_model_name}/Production"
         self.model = mlflow.pyfunc.load_model(uri)
+        logger.info("Model loaded successfully (version=%s)", self.version)
 
     @property
     def is_loaded(self) -> bool:
