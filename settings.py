@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     mlflow_tracking_uri: str = "mlruns"
     mlflow_experiment: str = "pitch_type_lgbm"
     registered_model_name: str = "PitchTypeClassifier"
-    # Base URL of the FastAPI server; used by the Streamlit frontend.
     api_url: str = "http://localhost:8001"
+    log_level: str = "INFO"
 
 
 settings = Settings()
