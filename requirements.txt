@@ -12,6 +12,7 @@ pybaseball==2.2.7
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
 pydantic==2.9.2
+pydantic-settings==2.6.1
 python-multipart==0.0.12
 streamlit==1.39.0
 requests==2.32.3
