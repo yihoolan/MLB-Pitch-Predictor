@@ -14,6 +14,7 @@ which the model's saved UsageImputer fills with the training-time global median.
 from __future__ import annotations
 
 import datetime
+import logging
 from typing import Literal
 
 import pandas as pd
@@ -27,6 +28,8 @@ pybaseball.cache.enable()
 
 from app.schemas import PlayerMatch
 from utils.feature_names import BATTER_USAGE_COLUMNS, PITCHER_USAGE_COLUMNS
+
+logger = logging.getLogger(__name__)
 
 _STATCAST_ERA_START = 2015
 
@@ -78,7 +81,7 @@ def _fetch_handedness(mlbam_ids: list[int], role: Literal["pitcher", "batter"]) 
             _handedness_cache[p["id"]] = code
             _position_cache[p["id"]] = (p.get("primaryPosition") or {}).get("code", "?")
     except Exception:
-        pass
+        logger.warning("MLB Stats API handedness fetch failed for ids=%s", missing)
 
 
 def search_players(
