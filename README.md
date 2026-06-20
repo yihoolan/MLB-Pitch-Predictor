@@ -10,7 +10,7 @@ A personal end-to-end ML project that predicts the **type of the next pitch** (f
 - **API**: `fastapi` + `uvicorn`
 - **UI**: `streamlit`
 - **Containerization**: Docker (added in a later step)
-- **CI/CD**: GitHub Actions (added in a later step)
+- **CI/CD**: GitHub Actions (lint/test gate on push and PRs)
 - **Hosting (optional)**: AWS
 
 ## Reproducible setup
@@ -31,6 +31,14 @@ pip install -r requirements-dev.txt   # runtime + notebooks + tooling
 ```bash
 pip install -r requirements.txt
 ```
+
+### Testing
+
+```bash
+pytest tests/ -q
+```
+
+CI runs the same command automatically on every push and PR to `main` via `.github/workflows/ci.yml`. No MLflow registry or network access is required — external calls are mocked.
 
 ### Docker
 
