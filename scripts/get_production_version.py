@@ -19,13 +19,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import mlflow  # noqa: E402 — path must be set first
 from mlflow.tracking import MlflowClient
 
-from training.config import REGISTERED_MODEL_NAME
+from settings import settings
 
+mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 client = MlflowClient()
-prod = client.get_latest_versions(REGISTERED_MODEL_NAME, stages=["Production"])
+prod = client.get_latest_versions(settings.registered_model_name, stages=["Production"])
 
 if not prod:
-    print(f"ERROR: no Production model found for '{REGISTERED_MODEL_NAME}'", file=sys.stderr)
+    print(f"ERROR: no Production model found for '{settings.registered_model_name}'", file=sys.stderr)
     sys.exit(1)
 
 prod_version = prod[0].version
