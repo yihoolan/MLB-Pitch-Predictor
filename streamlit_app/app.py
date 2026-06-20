@@ -11,7 +11,9 @@ from __future__ import annotations
 import requests
 import streamlit as st
 
-API_URL = "http://localhost:8001"
+from settings import settings
+
+API_URL = settings.api_url
 
 # ── Pitch type full names for display ─────────────────────────────────────────
 PITCH_NAMES = {
