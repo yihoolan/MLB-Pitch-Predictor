@@ -1,5 +1,3 @@
-import math
-
 import pandas as pd
 import pytest
 
@@ -46,6 +44,6 @@ def test_rookie_fills_global_median():
     rookie = _df({"pitch_usage_FF": float("nan"), "pitch_usage_SL": float("nan"), "pitch_usage_CH": float("nan")})
     result = imputer.transform(rookie)
 
-    assert result["pitch_usage_FF"].iloc[0] == pytest.approx(0.5)   # median of [0.6, 0.4]
-    assert result["pitch_usage_SL"].iloc[0] == pytest.approx(0.4)   # median of [0.3, 0.5]
-    assert result["pitch_usage_CH"].iloc[0] == pytest.approx(0.1)   # median of [0.1, 0.1]
+    assert result["pitch_usage_FF"].iloc[0] == pytest.approx(0.5)  # median of [0.6, 0.4]
+    assert result["pitch_usage_SL"].iloc[0] == pytest.approx(0.4)  # median of [0.3, 0.5]
+    assert result["pitch_usage_CH"].iloc[0] == pytest.approx(0.1)  # median of [0.1, 0.1]

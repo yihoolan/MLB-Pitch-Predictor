@@ -30,9 +30,7 @@ from utils.feature_names import BATTER_USAGE_COLUMNS, PITCHER_USAGE_COLUMNS
 _STATCAST_ERA_START = 2015
 
 
-# ---------------------------------------------------------------------------
-# Player name search
-# ---------------------------------------------------------------------------
+### Player name search
 
 
 def _load_register() -> pd.DataFrame:
@@ -71,10 +69,7 @@ def _fetch_handedness(mlbam_ids: list[int], role: Literal["pitcher", "batter"]) 
     if not missing:
         return
     # No fields filter — some MLB Stats API deployments ignore or truncate it.
-    url = (
-        "https://statsapi.mlb.com/api/v1/people"
-        f"?personIds={','.join(str(i) for i in missing)}"
-    )
+    url = "https://statsapi.mlb.com/api/v1/people" f"?personIds={','.join(str(i) for i in missing)}"
     try:
         for p in requests.get(url, timeout=5).json().get("people", []):
             field = "pitchHand" if role == "pitcher" else "batSide"
@@ -136,9 +131,7 @@ def search_players(
     return results
 
 
-# ---------------------------------------------------------------------------
-# Arsenal enrichment
-# ---------------------------------------------------------------------------
+### Arsenal enrichment
 
 # Cache keyed by year; each entry holds the full pitcher/batter usage tables
 # for that prior year so we only pay the pybaseball download cost once.
