@@ -1,11 +1,11 @@
-name: Monthly Incremental Training
+name: Annual Post-Season Incremental Training
 
 on:
   schedule:
-    # Runs at 09:00 UTC on the 1st of every month.
+    # Runs at 09:00 UTC on October 1st, after the regular season ends.
     # If the self-hosted runner is offline when this fires, GitHub will queue
     # the job for up to 6 hours.  Use workflow_dispatch to rerun manually.
-    - cron: "0 9 1 * *"
+    - cron: "0 9 1 10 *"
   workflow_dispatch:
     inputs:
       new_data_year:
