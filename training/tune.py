@@ -197,7 +197,8 @@ def run_tuning() -> None:
 
         print(f"Registering final model as '{REGISTERED_MODEL_NAME}'...")
         new_version = log_predictor(final_model, preprocessor, registered_model_name=REGISTERED_MODEL_NAME)
-        promote_if_better(new_version, metrics["log_loss"])
+        # Tuning runs always promote — pass prod_log_loss=None to skip the challenger comparison.
+        promote_if_better(new_version, metrics["log_loss"], prod_log_loss=None)
         print(f"Tuning run complete: {parent_run.info.run_id}")
 
 
