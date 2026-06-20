@@ -27,12 +27,11 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import log_loss
 
+from settings import settings
 from training.config import (
     EARLY_STOPPING_ROUNDS,
     LGBM_PARAMS,
-    MLFLOW_EXPERIMENT,
     N_ESTIMATORS,
-    REGISTERED_MODEL_NAME,
     TEST_MONTHS,
     TEST_YEAR,
     TRAIN_END_MONTH,
@@ -61,7 +60,8 @@ def run_full() -> None:
     print("Building LightGBM datasets...")
     ds_train, ds_val, X_test, y_test, preprocessor = build_lgb_datasets(train_df, val_df, test_df)
 
-    mlflow.set_experiment(MLFLOW_EXPERIMENT)
+    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+    mlflow.set_experiment(settings.mlflow_experiment)
     with mlflow.start_run() as run:
         mlflow.set_tags(
             {
@@ -105,8 +105,8 @@ def run_full() -> None:
             f"  macro_f1={metrics['macro_f1']:.4f}"
         )
 
-        print(f"Logging model to registry as '{REGISTERED_MODEL_NAME}'...")
-        new_version = log_predictor(model, preprocessor, registered_model_name=REGISTERED_MODEL_NAME)
+        print(f"Logging model to registry as '{settings.registered_model_name}'...")
+        new_version = log_predictor(model, preprocessor, registered_model_name=settings.registered_model_name)
         # Full retrains always promote — pass prod_log_loss=None to skip the challenger comparison.
         promote_if_better(new_version, metrics["log_loss"], prod_log_loss=None)
         print(f"Run complete: {run.info.run_id}")
@@ -119,7 +119,7 @@ def _score_production_on_test(test_df: pd.DataFrame, y_test: np.ndarray) -> floa
     Returns None if no Production model exists — the caller will promote unconditionally.
     """
     try:
-        prod_pyfunc = mlflow.pyfunc.load_model(f"models:/{REGISTERED_MODEL_NAME}/Production")
+        prod_pyfunc = mlflow.pyfunc.load_model(f"models:/{settings.registered_model_name}/Production")
         prod_probs = prod_pyfunc.predict(test_df)
         return log_loss(y_test, prod_probs, labels=list(range(len(PITCH_TYPES))))
     except Exception as exc:
@@ -142,8 +142,8 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
             f"Current month is {today.month} — re-run in October or later."
         )
 
-    print(f"Loading base model '{REGISTERED_MODEL_NAME}' v{base_version} from registry...")
-    model_uri = f"models:/{REGISTERED_MODEL_NAME}/{base_version}"
+    print(f"Loading base model '{settings.registered_model_name}' v{base_version} from registry...")
+    model_uri = f"models:/{settings.registered_model_name}/{base_version}"
     base_model: lgb.Booster = mlflow.lightgbm.load_model(model_uri)
 
     print(f"Loading {new_data_year} data...")
@@ -161,7 +161,8 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
     print("Building LightGBM datasets...")
     ds_train, ds_val, X_test, y_test, preprocessor = build_lgb_datasets(train_df, val_df, test_df)
 
-    mlflow.set_experiment(MLFLOW_EXPERIMENT)
+    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+    mlflow.set_experiment(settings.mlflow_experiment)
     with mlflow.start_run() as run:
         mlflow.set_tags(
             {
@@ -214,8 +215,8 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
         test_df_filtered = test_df[test_df[LABEL_COLUMN].isin(PITCH_TYPES)].reset_index(drop=True)
         prod_log_loss = _score_production_on_test(test_df_filtered, y_test)
 
-        print(f"Logging updated model to registry as '{REGISTERED_MODEL_NAME}'...")
-        new_version = log_predictor(model, preprocessor, registered_model_name=REGISTERED_MODEL_NAME)
+        print(f"Logging updated model to registry as '{settings.registered_model_name}'...")
+        new_version = log_predictor(model, preprocessor, registered_model_name=settings.registered_model_name)
         promote_if_better(new_version, metrics["log_loss"], prod_log_loss)
         print(f"Run complete: {run.info.run_id}")
 
