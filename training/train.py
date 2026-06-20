@@ -16,6 +16,7 @@ warnings.filterwarnings("ignore", category=FutureWarning, module="pybaseball")
 
 import pybaseball
 
+pybaseball.cache.config.cache_directory = "data/cache"
 pybaseball.cache.enable()
 
 import argparse
