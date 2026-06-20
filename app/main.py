@@ -14,16 +14,19 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
+import mlflow
 from fastapi import FastAPI
 
 from app.enrichment import _current_prior_year, _get_arsenal_tables
 from app.model import model_registry
 from app.routers import players, predict
 from app.schemas import HealthResponse
+from settings import settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     model_registry.load_production()
     _get_arsenal_tables(_current_prior_year())
     yield
