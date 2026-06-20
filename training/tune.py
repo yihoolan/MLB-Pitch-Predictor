@@ -27,16 +27,15 @@ import pandas as pd
 from optuna_integration.lightgbm import LightGBMPruningCallback
 from sklearn.metrics import accuracy_score, f1_score, log_loss
 
+from settings import settings
 from training.config import (
     EARLY_STOPPING_ROUNDS,
     LGBM_PARAMS,
-    MLFLOW_EXPERIMENT,
     N_ESTIMATORS,
     OPTUNA_N_TRIALS,
     OPTUNA_PARAM_SPACE,
     OPTUNA_STUDY_NAME,
     RANDOM_STATE,
-    REGISTERED_MODEL_NAME,
     TEST_MONTHS,
     TEST_YEAR,
     TRAIN_END_MONTH,
@@ -141,7 +140,8 @@ def run_tuning() -> None:
     print("Building LightGBM datasets for Optuna search...")
     ds_train, ds_val, X_val, y_val, _ = build_lgb_datasets(train_df, val_df)
 
-    mlflow.set_experiment(MLFLOW_EXPERIMENT)
+    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+    mlflow.set_experiment(settings.mlflow_experiment)
     with mlflow.start_run(run_name=OPTUNA_STUDY_NAME) as parent_run:
         mlflow.log_param("n_trials", OPTUNA_N_TRIALS)
 
@@ -195,8 +195,8 @@ def run_tuning() -> None:
             }
         )
 
-        print(f"Registering final model as '{REGISTERED_MODEL_NAME}'...")
-        new_version = log_predictor(final_model, preprocessor, registered_model_name=REGISTERED_MODEL_NAME)
+        print(f"Registering final model as '{settings.registered_model_name}'...")
+        new_version = log_predictor(final_model, preprocessor, registered_model_name=settings.registered_model_name)
         # Tuning runs always promote — pass prod_log_loss=None to skip the challenger comparison.
         promote_if_better(new_version, metrics["log_loss"], prod_log_loss=None)
         print(f"Tuning run complete: {parent_run.info.run_id}")
