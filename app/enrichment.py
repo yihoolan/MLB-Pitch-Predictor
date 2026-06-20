@@ -22,6 +22,7 @@ import requests
 from pybaseball import statcast_batter_pitch_arsenal, statcast_pitcher_arsenal_stats
 from pybaseball.playerid_lookup import get_lookup_table
 
+pybaseball.cache.config.cache_directory = "data/cache"
 pybaseball.cache.enable()
 
 from app.schemas import PlayerMatch
