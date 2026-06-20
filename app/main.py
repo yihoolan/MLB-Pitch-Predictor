@@ -12,6 +12,7 @@ Endpoints:
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 import mlflow
@@ -26,6 +27,10 @@ from settings import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logging.basicConfig(
+        level=settings.log_level.upper(),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     try:
         model_registry.load_production()
