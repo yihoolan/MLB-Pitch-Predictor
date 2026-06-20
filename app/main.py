@@ -27,7 +27,10 @@ from settings import settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-    model_registry.load_production()
+    try:
+        model_registry.load_production()
+    except RuntimeError:
+        pass
     _get_arsenal_tables(_current_prior_year())
     yield
 
