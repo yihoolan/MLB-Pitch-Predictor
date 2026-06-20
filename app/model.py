@@ -10,7 +10,7 @@ from __future__ import annotations
 import mlflow.pyfunc
 from mlflow.tracking import MlflowClient
 
-from training.config import REGISTERED_MODEL_NAME
+from settings import settings
 
 
 class ModelRegistry:
@@ -26,14 +26,14 @@ class ModelRegistry:
         Raises RuntimeError if no Production version exists yet.
         """
         client = MlflowClient()
-        versions = client.get_latest_versions(REGISTERED_MODEL_NAME, stages=["Production"])
+        versions = client.get_latest_versions(settings.registered_model_name, stages=["Production"])
         if not versions:
             raise RuntimeError(
-                f"No Production model found in registry '{REGISTERED_MODEL_NAME}'. "
+                f"No Production model found in registry '{settings.registered_model_name}'. "
                 "Run `python -m training.train --mode full` first."
             )
         self.version = str(versions[0].version)
-        uri = f"models:/{REGISTERED_MODEL_NAME}/Production"
+        uri = f"models:/{settings.registered_model_name}/Production"
         self.model = mlflow.pyfunc.load_model(uri)
 
     @property
