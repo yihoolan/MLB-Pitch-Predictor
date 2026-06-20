@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pandas as pd
 from fastapi import APIRouter, HTTPException
@@ -8,6 +10,8 @@ from app.enrichment import enrich_row
 from app.model import model_registry
 from app.schemas import GameStateRequest, PitchProbabilities
 from utils.feature_names import MODEL_FEATURES, PITCH_TYPES
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/predict", tags=["predict"])
 
@@ -22,6 +26,7 @@ def predict(request: GameStateRequest) -> PitchProbabilities:
     median via the model's saved UsageImputer.
     """
     if not model_registry.is_loaded:
+        logger.error("Predict called but no model is loaded")
         raise HTTPException(status_code=503, detail="Model not loaded. Call POST /reload or restart the server.")
 
     usage, rookie_pitcher, rookie_batter = enrich_row(
@@ -52,6 +57,13 @@ def predict(request: GameStateRequest) -> PitchProbabilities:
     probs_flat: np.ndarray = np.asarray(probs_array).flatten()
     probabilities = {pt: float(p) for pt, p in zip(PITCH_TYPES, probs_flat)}
     top_pitch = max(probabilities, key=probabilities.__getitem__)
+
+    logger.info(
+        "predict pitcher=%s batter=%s top_pitch=%s",
+        request.pitcher_name,
+        request.batter_name,
+        top_pitch,
+    )
 
     return PitchProbabilities(
         probabilities=probabilities,
