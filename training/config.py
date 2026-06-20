@@ -1,7 +1,5 @@
 from utils.feature_names import PITCH_TYPES
 
-MLFLOW_EXPERIMENT = "pitch_type_lgbm"
-REGISTERED_MODEL_NAME = "PitchTypeClassifier"
 RANDOM_STATE = 42
 
 LGBM_PARAMS: dict = {
