@@ -4,8 +4,8 @@ Usage:
     # Full training from scratch (2023+2024 train, 2024 Aug-Sep val, 2025 Apr-May test)
     python -m training.train --mode full
 
-    # Incremental training: append new trees on top of an existing registered model
-    python -m training.train --mode incremental --new-data-year 2025 --base-version 1
+    # Incremental training: run once per year in October after the season ends
+    python -m training.train --mode incremental --new-data-year 2026 --base-version 1
 """
 
 from __future__ import annotations
@@ -19,10 +19,13 @@ import pybaseball
 pybaseball.cache.enable()
 
 import argparse
+from datetime import date
 
 import lightgbm as lgb
 import mlflow
+import numpy as np
 import pandas as pd
+from sklearn.metrics import log_loss
 
 from training.config import (
     EARLY_STOPPING_ROUNDS,
@@ -40,6 +43,7 @@ from training.data import build_lgb_datasets, load_season
 from training.evaluate import log_artifacts
 from training.predictor import log_predictor
 from training.promote import promote_if_better
+from utils.feature_names import LABEL_COLUMN, PITCH_TYPES
 
 
 def run_full() -> None:
@@ -103,30 +107,59 @@ def run_full() -> None:
 
         print(f"Logging model to registry as '{REGISTERED_MODEL_NAME}'...")
         new_version = log_predictor(model, preprocessor, registered_model_name=REGISTERED_MODEL_NAME)
-        promote_if_better(new_version, metrics["log_loss"])
+        # Full retrains always promote — pass prod_log_loss=None to skip the challenger comparison.
+        promote_if_better(new_version, metrics["log_loss"], prod_log_loss=None)
         print(f"Run complete: {run.info.run_id}")
+
+
+def _score_production_on_test(test_df: pd.DataFrame, y_test: np.ndarray) -> float | None:
+    """Load the current Production pyfunc and score it on test_df, returning log_loss.
+
+    test_df must already be filtered to known pitch types (same rows that produced y_test).
+    Returns None if no Production model exists — the caller will promote unconditionally.
+    """
+    try:
+        prod_pyfunc = mlflow.pyfunc.load_model(f"models:/{REGISTERED_MODEL_NAME}/Production")
+        prod_probs = prod_pyfunc.predict(test_df)
+        return log_loss(y_test, prod_probs, labels=list(range(len(PITCH_TYPES))))
+    except Exception as exc:
+        print(f"  Could not load Production model for challenger eval ({exc}); promoting unconditionally.")
+        return None
 
 
 def run_incremental(new_data_year: int, base_version: int) -> None:
     """Append new trees on top of an existing registered model using LightGBM init_model.
 
-    Loads the base model from the MLflow registry, trains on new_data_year Apr–Jul,
-    validates on new_data_year Aug–Sep, and registers the updated model as a new version.
+    Intended to run once per year in October after the full season (Apr–Sep) is complete.
+    Splits the season 70/15/15 temporally and uses challenger-based promotion: both the
+    new model and the current Production model are scored on the same test slice, and
+    the new model is only promoted if it wins.
     """
+    today = date.today()
+    if today.month < 10:
+        raise ValueError(
+            f"Incremental training is intended to run after the season ends. "
+            f"Current month is {today.month} — re-run in October or later."
+        )
+
     print(f"Loading base model '{REGISTERED_MODEL_NAME}' v{base_version} from registry...")
     model_uri = f"models:/{REGISTERED_MODEL_NAME}/{base_version}"
     base_model: lgb.Booster = mlflow.lightgbm.load_model(model_uri)
 
     print(f"Loading {new_data_year} data...")
     df_new = load_season(new_data_year)
-
-    month = pd.to_datetime(df_new["game_date"]).dt.month
-    train_df = df_new[month <= 7].copy()
-    val_df = df_new[month >= 8].copy()
+    df_new = df_new.sort_values("game_date").reset_index(drop=True)
+    n = len(df_new)
+    train_df = df_new.iloc[: int(n * 0.70)].copy()
+    val_df = df_new.iloc[int(n * 0.70) : int(n * 0.85)].copy()
+    test_df = df_new.iloc[int(n * 0.85) :].copy()
+    print(
+        f"  Split: {len(train_df)} train / {len(val_df)} val / {len(test_df)} test rows"
+        f"  (val from {val_df['game_date'].iloc[0]}, test from {test_df['game_date'].iloc[0]})"
+    )
 
     print("Building LightGBM datasets...")
-    # No separate test set for incremental runs — evaluate on the held-out val months
-    ds_train, ds_val, X_val, y_val, preprocessor = build_lgb_datasets(train_df, val_df)
+    ds_train, ds_val, X_test, y_test, preprocessor = build_lgb_datasets(train_df, val_df, test_df)
 
     mlflow.set_experiment(MLFLOW_EXPERIMENT)
     with mlflow.start_run() as run:
@@ -135,6 +168,8 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
                 "training_mode": "incremental",
                 "new_data_year": str(new_data_year),
                 "base_model_version": str(base_version),
+                "val_start_date": str(val_df["game_date"].iloc[0]),
+                "test_start_date": str(test_df["game_date"].iloc[0]),
             }
         )
         mlflow.log_params(
@@ -146,6 +181,7 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
                 "n_features": len(preprocessor.feature_cols),
                 "train_rows": len(train_df),
                 "val_rows": len(val_df),
+                "test_rows": len(test_df),
                 "base_trees": base_model.num_trees(),
             }
         )
@@ -165,8 +201,8 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
         mlflow.log_metric("total_trees", model.num_trees())
         mlflow.log_metric("new_trees_added", model.num_trees() - base_model.num_trees())
 
-        print("Evaluating on validation set...")
-        metrics = log_artifacts(model, X_val, y_val, preprocessor.feature_cols)
+        print("Evaluating new model on test set...")
+        metrics = log_artifacts(model, X_test, y_test, preprocessor.feature_cols)
         print(
             f"  weighted_f1={metrics['weighted_f1']:.4f}"
             f"  log_loss={metrics['log_loss']:.4f}"
@@ -174,9 +210,13 @@ def run_incremental(new_data_year: int, base_version: int) -> None:
             f"  macro_f1={metrics['macro_f1']:.4f}"
         )
 
+        print("Scoring Production model on same test slice for challenger comparison...")
+        test_df_filtered = test_df[test_df[LABEL_COLUMN].isin(PITCH_TYPES)].reset_index(drop=True)
+        prod_log_loss = _score_production_on_test(test_df_filtered, y_test)
+
         print(f"Logging updated model to registry as '{REGISTERED_MODEL_NAME}'...")
         new_version = log_predictor(model, preprocessor, registered_model_name=REGISTERED_MODEL_NAME)
-        promote_if_better(new_version, metrics["log_loss"])
+        promote_if_better(new_version, metrics["log_loss"], prod_log_loss)
         print(f"Run complete: {run.info.run_id}")
 
 
