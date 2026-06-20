@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from mlflow.tracking import MlflowClient
 
-from training.config import REGISTERED_MODEL_NAME
+from settings import settings
 
 
 def promote_if_better(new_version: str, new_log_loss: float, prod_log_loss: float | None) -> bool:
@@ -26,16 +26,16 @@ def promote_if_better(new_version: str, new_log_loss: float, prod_log_loss: floa
     client = MlflowClient()
 
     if prod_log_loss is None:
-        client.transition_model_version_stage(REGISTERED_MODEL_NAME, new_version, "Production")
+        client.transition_model_version_stage(settings.registered_model_name, new_version, "Production")
         print(f"  No Production baseline — promoted v{new_version} directly.")
         return True
 
-    prod = client.get_latest_versions(REGISTERED_MODEL_NAME, stages=["Production"])
+    prod = client.get_latest_versions(settings.registered_model_name, stages=["Production"])
 
     if new_log_loss < prod_log_loss:
         if prod:
-            client.transition_model_version_stage(REGISTERED_MODEL_NAME, prod[0].version, "Archived")
-        client.transition_model_version_stage(REGISTERED_MODEL_NAME, new_version, "Production")
+            client.transition_model_version_stage(settings.registered_model_name, prod[0].version, "Archived")
+        client.transition_model_version_stage(settings.registered_model_name, new_version, "Production")
         print(
             f"  Promoted v{new_version} to Production "
             f"(log_loss {new_log_loss:.4f} < {prod_log_loss:.4f}). "
