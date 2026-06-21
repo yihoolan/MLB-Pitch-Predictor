@@ -1,0 +1,20 @@
+services:
+  api:
+    image: ghcr.io/yihoolan/mlb-pitch-predictor-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+
+  streamlit:
+    image: ghcr.io/yihoolan/mlb-pitch-predictor-streamlit:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8001
+    depends_on:
+      - api
