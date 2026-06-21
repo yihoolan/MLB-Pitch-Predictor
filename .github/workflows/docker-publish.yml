@@ -3,6 +3,16 @@ name: Docker Publish
 on:
   push:
     branches: [main]
+    paths:
+      - "app/**"
+      - "streamlit_app/**"
+      - "utils/**"
+      - "training/**"
+      - "model/**"
+      - "settings.py"
+      - "requirements.txt"
+      - "Dockerfile"
+      - "Dockerfile.streamlit"
 
 permissions:
   packages: write
@@ -13,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -35,6 +47,8 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ghcr.io/yihoolan/mlb-pitch-predictor-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build and push Streamlit image
         uses: docker/build-push-action@v6
@@ -44,3 +58,5 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ghcr.io/yihoolan/mlb-pitch-predictor-streamlit:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
