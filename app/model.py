@@ -1,4 +1,7 @@
-"""MLflow model registry loader with hot-reload support.
+"""Model loader for the FastAPI service.
+
+Loads the LightGBM booster and fitted Preprocessor directly from the committed
+model/ directory. No MLflow registry access is needed at serve time.
 
 The module keeps a single ModelRegistry instance (model_registry) that the
 FastAPI lifespan loads at startup and POST /reload refreshes without restarting
@@ -8,38 +11,58 @@ the server process.
 from __future__ import annotations
 
 import logging
+import pickle
+from pathlib import Path
 
-import mlflow.pyfunc
-from mlflow.tracking import MlflowClient
+import lightgbm as lgb
 
-from settings import settings
+from training.predictor import PitchPredictor
 
 logger = logging.getLogger(__name__)
 
+MODEL_DIR = Path(__file__).parent.parent / "model"
+
+
+class _LoadedModel:
+    """Thin wrapper that presents a .predict(df) interface over PitchPredictor."""
+
+    def __init__(self, predictor: PitchPredictor) -> None:
+        self._predictor = predictor
+
+    def predict(self, df):
+        # PitchPredictor.predict(context, model_input) — context is unused at inference
+        return self._predictor.predict(None, df)
+
 
 class ModelRegistry:
-    """Holds the in-memory Production model and its registry version."""
+    """Holds the in-memory model and its version string."""
 
     def __init__(self) -> None:
-        self.model: mlflow.pyfunc.PyFuncModel | None = None
+        self.model: _LoadedModel | None = None
         self.version: str | None = None
 
     def load_production(self) -> None:
-        """Load (or reload) the Production model from the local MLflow registry.
+        """Load (or reload) the model from the model/ directory.
 
-        Raises RuntimeError if no Production version exists yet.
+        Raises RuntimeError if the model files are missing.
         """
-        client = MlflowClient()
-        versions = client.get_latest_versions(settings.registered_model_name, stages=["Production"])
-        if not versions:
+        booster_path = MODEL_DIR / "model.lgb"
+        preprocessor_path = MODEL_DIR / "preprocessor.pkl"
+        version_path = MODEL_DIR / "version.txt"
+
+        if not booster_path.exists() or not preprocessor_path.exists():
             raise RuntimeError(
-                f"No Production model found in registry '{settings.registered_model_name}'. "
-                "Run `python -m training.train --mode full` first."
+                "Model files not found in model/. "
+                "Run `python scripts/export_model.py` to export the Production model first."
             )
-        self.version = str(versions[0].version)
-        logger.info("Loading Production model version %s", self.version)
-        uri = f"models:/{settings.registered_model_name}/Production"
-        self.model = mlflow.pyfunc.load_model(uri)
+
+        predictor = PitchPredictor()
+        predictor.booster = lgb.Booster(model_file=str(booster_path))
+        with open(preprocessor_path, "rb") as f:
+            predictor.preprocessor = pickle.load(f)
+
+        self.model = _LoadedModel(predictor)
+        self.version = version_path.read_text().strip() if version_path.exists() else "unknown"
         logger.info("Model loaded successfully (version=%s)", self.version)
 
     @property
