@@ -75,21 +75,16 @@ After training, promote the best run to Production in the MLflow UI (`mlflow ui`
 
 ### Updating the Docker images after a retrain
 
-Once a new model is promoted to Production, rebuild and push the images to GHCR:
+Once a new model is promoted to Production, export its artifacts and push:
 
 ```bash
-bash scripts/rebuild_docker.sh
+python scripts/export_model.py
+git add model/
+git commit -m "chore(model): export Production model vN"
+git push
 ```
 
-This rebakes `mlruns/` into the API image and pushes both images. Users get the updated model on their next `docker compose pull && docker compose up`.
-
-> **Note:** Incremental training loads the base model from the local `mlruns/` directory, so it must run on the same machine that holds `mlruns/`. If you're switching machines, copy `mlruns/` over first. Full retrains (`--mode full`) have no such dependency — `mlruns/` is created from scratch.
-
-Requires a one-time login before the first push:
-
-```bash
-docker login ghcr.io -u yihoolan --password <PAT with write:packages scope>
-```
+Pushing to `main` automatically triggers the `docker-publish` CI workflow, which builds and pushes both Docker images to GHCR. Users get the updated model on their next `docker compose pull && docker compose up`.
 
 ---
 
@@ -103,10 +98,11 @@ MLB-Pitch-Predictor/
 │   └── routers/        # Route handlers for /players and /predict
 ├── streamlit_app/      # Streamlit dashboard — calls the FastAPI service over HTTP
 ├── utils/              # Shared feature definitions and preprocessing transforms
-├── scripts/            # Utility scripts (production model selection, Docker rebuild)
+├── scripts/            # Utility scripts (export model artifacts, CI helpers)
+├── model/              # Committed Production model artifacts (model.lgb, preprocessor.pkl)
 ├── data/               # Raw / processed Statcast data (gitignored)
-├── mlruns/             # MLflow experiment tracking and model registry (gitignored)
-├── Dockerfile          # API service image (mlruns/ baked in at build time)
+├── mlruns/             # MLflow experiment tracking and model registry (gitignored, local only)
+├── Dockerfile          # API service image (model/ baked in at build time)
 ├── Dockerfile.streamlit
 ├── docker-compose.yml
 ├── requirements.txt        # Runtime dependencies
@@ -121,7 +117,7 @@ MLB-Pitch-Predictor/
 
 **Hyperparameter tuning and promotion.** `training/tune.py` drives an Optuna search across `OPTUNA_N_TRIALS` trials, each logged as a nested MLflow run. After any training run, `training/promote.py` compares the challenger's log-loss against the current Production version and transitions stages if the new model wins.
 
-**API startup and request path.** On startup, `app/model.py` loads the Production model from MLflow. Prediction requests are enriched with live arsenal stats by `app/enrichment.py`, then passed to `routers/predict.py`, which returns pitch-type probabilities.
+**API startup and request path.** On startup, `app/model.py` loads the Production model directly from the committed `model/` directory (`model.lgb` and `preprocessor.pkl`). Prediction requests are enriched with live arsenal stats by `app/enrichment.py`, then passed to `routers/predict.py`, which returns pitch-type probabilities.
 
 **Streamlit → API.** A front-end dashboard powered by `streamlit_app/app.py` that routes requests to the FastAPI service to display real-time pitch probabilities.
 
