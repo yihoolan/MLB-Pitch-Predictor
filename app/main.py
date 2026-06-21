@@ -1,11 +1,11 @@
 """FastAPI application entry point.
 
-Run from the project root (where mlruns/ lives):
+Run from the project root:
     uvicorn app.main:app --reload
 
 Endpoints:
     GET  /health         — model load status and version
-    POST /reload         — hot-swap the Production model without restarting
+    POST /reload         — hot-swap the model without restarting
     GET  /players        — fuzzy player name search
     POST /predict        — pitch-type probability prediction
 """
@@ -15,7 +15,6 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-import mlflow
 from fastapi import FastAPI
 
 from app.enrichment import _current_prior_year, _get_arsenal_tables
@@ -31,7 +30,6 @@ async def lifespan(app: FastAPI):
         level=settings.log_level.upper(),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     try:
         model_registry.load_production()
     except RuntimeError:
@@ -63,9 +61,9 @@ def health() -> HealthResponse:
 
 @app.post("/reload", response_model=HealthResponse, tags=["meta"])
 def reload() -> HealthResponse:
-    """Reload the Production model from the MLflow registry.
+    """Reload the model from the model/ directory.
 
-    Call this after running a new training run that promoted a better model.
+    Call this after exporting a new Production model and updating model/ on disk.
     Takes effect immediately without restarting the server process.
     """
     model_registry.load_production()
