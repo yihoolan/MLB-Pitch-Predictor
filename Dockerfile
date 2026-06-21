@@ -8,6 +8,6 @@ COPY app/ ./app/
 COPY utils/ ./utils/
 COPY training/ ./training/
 COPY settings.py .
-COPY mlruns/ ./mlruns/
+COPY model/ ./model/
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
