@@ -40,7 +40,7 @@ Start the API and the dashboard in separate terminals from the project root:
 
 ```bash
 uvicorn app.main:app --reload --port 8001
-streamlit run streamlit_app/app.py
+python -m streamlit run streamlit_app/app.py
 ```
 
 ### Testing
