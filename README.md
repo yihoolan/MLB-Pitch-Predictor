@@ -112,3 +112,23 @@ MLB-Pitch-Predictor/
 ├── requirements.txt        # Runtime dependencies
 └── requirements-dev.txt    # Dev superset: runtime + Jupyter + lint/test tools
 ```
+
+---
+
+## Architecture & Code Flow
+
+**Offline training pipeline.** `training/data.py` pulls Statcast seasons via pybaseball and merges prior-year pitcher and batter arsenal stats (via `utils/enrichment.py`), producing temporal train/val/test splits. `training/train.py` fits a LightGBM classifier and wraps it in a `PitchPredictor` pyfunc (`training/predictor.py`) before logging everything to MLflow.
+
+**Hyperparameter tuning and promotion.** `training/tune.py` drives an Optuna search across `OPTUNA_N_TRIALS` trials, each logged as a nested MLflow run. After any training run, `training/promote.py` compares the challenger's log-loss against the current Production version and transitions stages if the new model wins.
+
+**API startup and request path.** On startup, `app/model.py` loads the Production model from MLflow. Prediction requests are enriched with live arsenal stats by `app/enrichment.py`, then passed to `routers/predict.py`, which returns pitch-type probabilities.
+
+**Streamlit → API.** A front-end dashboard powered by `streamlit_app/app.py` that routes requests to the FastAPI service to display real-time pitch probabilities.
+
+### Also in this repo
+
+**Exploration** — Jupyter notebooks in `exploration/` cover the EDA and feature-selection arc that determined which Statcast columns to use in production. Findings are summarized in `00_exploration_findings.md`.
+
+**Tests** — `test_api.py` and `test_transforms.py` provide simple tests for API startup and data transformation functions.
+
+**Docker** — `Dockerfile` and `Dockerfile.streamlit` package the API and dashboard with all dependencies baked in. `docker-compose.yml` wires the two services together for instant front-end replication with a single `docker compose up`.
