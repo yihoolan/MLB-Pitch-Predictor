@@ -1,0 +1,37 @@
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Git
+.git/
+.github/
+
+# Dev tooling
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+requirements-dev.txt
+
+# Data (never bake raw/cached data into images)
+data/
+
+# MLflow artifacts mirror — only mlruns/ is needed
+mlartifacts/
+
+# Notebooks and exploration
+exploration/
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Env files with secrets
+.env
