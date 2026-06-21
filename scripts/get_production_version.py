@@ -16,7 +16,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-import mlflow  # noqa: E402 — path must be set first
+import mlflow
 from mlflow.tracking import MlflowClient
 
 from settings import settings
