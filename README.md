@@ -8,7 +8,7 @@ Predicts the **type of the next pitch** (fastball, slider, curveball, ...) given
 
 ## Running the dashboard (no setup required)
 
-The easiest way to run the dashboard is with Docker. No Python environment, no training pipeline.
+The easiest way to run the dashboard is with Docker. 
 
 ```bash
 git clone https://github.com/yihoolan/MLB-Pitch-Predictor.git
@@ -31,7 +31,7 @@ Requires Python 3.11.
 python3.11 -m venv .venv
 source .venv/bin/activate            # PowerShell: .venv\Scripts\Activate.ps1
 pip install --upgrade pip
-pip install -r requirements-dev.txt  # runtime + notebooks + lint/test tools
+pip install -r requirements-dev.txt  # model-development + notebooks + lint/test tools
 ```
 
 ### Running locally without Docker
@@ -49,7 +49,7 @@ streamlit run streamlit_app/app.py
 pytest tests/ -q
 ```
 
-CI runs the same command on every push and PR to `main` via `.github/workflows/ci.yml`. External calls are mocked — no MLflow registry or network access needed.
+CI runs the same command on every push and PR to `main` via `.github/workflows/ci.yml`.
 
 ---
 
@@ -132,3 +132,6 @@ MLB-Pitch-Predictor/
 **Tests** — `test_api.py` and `test_transforms.py` provide simple tests for API startup and data transformation functions.
 
 **Docker** — `Dockerfile` and `Dockerfile.streamlit` package the API and dashboard with all dependencies baked in. `docker-compose.yml` wires the two services together for instant front-end replication with a single `docker compose up`.
+
+## Recognition
+LLM is prompted sporadically for clear documentation and boilerplate functionalities
