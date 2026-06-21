@@ -230,6 +230,7 @@ data/cache/*
 models/
 !models/.gitkeep
 *.pkl
+!model/preprocessor.pkl
 *.joblib
 *.h5
 *.onnx
