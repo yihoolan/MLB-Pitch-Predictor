@@ -71,7 +71,7 @@ Hyperparameter tuning runs separately:
 python -m training.tune
 ```
 
-After training, promote the best run to Production in the MLflow UI (`mlflow ui`) or via the promotion script in `scripts/`.
+After training completes, the best model is automatically promoted to Production in the local MLflow registry.
 
 ### Updating the Docker images after a retrain
 
