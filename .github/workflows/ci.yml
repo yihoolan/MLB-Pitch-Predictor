@@ -15,4 +15,4 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements-dev.txt --quiet
-      - run: pytest tests/ -q
+      - run: PYTHONPATH=. pytest tests/ -q
