@@ -1,21 +1,29 @@
-# MLB-Pitch-Predictor
+# MLB Pitch Predictor
 
-A personal end-to-end ML project that predicts the **type of the next pitch** (fastball, slider, curveball, ...) given game context, using Statcast data fetched via [`pybaseball`](https://github.com/jldbc/pybaseball). This is a reproducible end-to-end pipeline with the following structure: EDA in notebooks, modular training code, model versioning with MLflow, a FastAPI prediction service, a Streamlit UI, all containerized with Docker and wired up to GitHub for CI/CD.
+Predicts the **type of the next pitch** (fastball, slider, curveball, ...) given the current game situation and pitcher/batter matchup, using Statcast data from [`pybaseball`](https://github.com/jldbc/pybaseball). The model is a LightGBM classifier trained on pitch-by-pitch Statcast data, served through a FastAPI backend and a Streamlit dashboard.
 
-## Stack
+**Stack:** `pybaseball` · `lightgbm` · `scikit-learn` · `optuna` · `mlflow` · `fastapi` · `uvicorn` · `streamlit` · Docker · GitHub Actions
 
-- **Data**: `pybaseball` (Statcast pulls)
-- **Modeling**: `scikit-learn`, `pandas`, `numpy`
-- **Experiment tracking & registry**: `mlflow`
-- **API**: `fastapi` + `uvicorn`
-- **UI**: `streamlit`
-- **Containerization**: Docker (added in a later step)
-- **CI/CD**: GitHub Actions (lint/test gate on push and PRs)
-- **Hosting (optional)**: AWS
+---
 
-## Reproducible setup
+## Running the dashboard (no setup required)
 
-### Local development
+The easiest way to run the dashboard is with Docker. No Python environment, no training pipeline.
+
+```bash
+git clone https://github.com/yihoolan/MLB-Pitch-Predictor.git
+cd MLB-Pitch-Predictor
+docker compose pull
+docker compose up
+```
+
+Open `http://localhost:8501` in your browser. The FastAPI backend starts alongside the Streamlit app automatically.
+
+> **Note:** On first startup the API downloads current-season arsenal stats from Baseball Reference. This takes a minute but only happens once per container session.
+
+---
+
+## Developer setup
 
 Requires Python 3.11.
 
@@ -23,13 +31,16 @@ Requires Python 3.11.
 python3.11 -m venv .venv
 source .venv/bin/activate            # PowerShell: .venv\Scripts\Activate.ps1
 pip install --upgrade pip
-pip install -r requirements-dev.txt   # runtime + notebooks + tooling
+pip install -r requirements-dev.txt  # runtime + notebooks + lint/test tools
 ```
 
-### Runtime-only (mirrors what Docker will install)
+### Running locally without Docker
+
+Start the API and the dashboard in separate terminals from the project root:
 
 ```bash
-pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8001
+streamlit run streamlit_app/app.py
 ```
 
 ### Testing
@@ -38,16 +49,49 @@ pip install -r requirements.txt
 pytest tests/ -q
 ```
 
-CI runs the same command automatically on every push and PR to `main` via `.github/workflows/ci.yml`. No MLflow registry or network access is required — external calls are mocked.
+CI runs the same command on every push and PR to `main` via `.github/workflows/ci.yml`. External calls are mocked — no MLflow registry or network access needed.
 
-### Docker
+---
 
-Coming in the deployment step. Will follow the pattern:
+## Training
+
+Training pulls Statcast data, tunes a LightGBM classifier with Optuna, and registers the best model in the local MLflow registry under `PitchTypeClassifier`.
 
 ```bash
-docker build -t mlb-pitch-predictor .
-docker compose up
+# Full retrain from scratch
+python -m training.train --mode full
+
+# Incremental update on recent seasons only
+python -m training.train --mode incremental
 ```
+
+Hyperparameter tuning runs separately:
+
+```bash
+python -m training.tune
+```
+
+After training, promote the best run to Production in the MLflow UI (`mlflow ui`) or via the promotion script in `scripts/`.
+
+### Updating the Docker images after a retrain
+
+Once a new model is promoted to Production, rebuild and push the images to GHCR:
+
+```bash
+bash scripts/rebuild_docker.sh
+```
+
+This rebakes `mlruns/` into the API image and pushes both images. Users get the updated model on their next `docker compose pull && docker compose up`.
+
+> **Note:** Incremental training loads the base model from the local `mlruns/` directory, so it must run on the same machine that holds `mlruns/`. If you're switching machines, copy `mlruns/` over first. Full retrains (`--mode full`) have no such dependency — `mlruns/` is created from scratch.
+
+Requires a one-time login before the first push:
+
+```bash
+docker login ghcr.io -u yihoolan --password <PAT with write:packages scope>
+```
+
+---
 
 ## Repo layout
 
@@ -57,12 +101,14 @@ MLB-Pitch-Predictor/
 ├── training/           # LightGBM training, tuning, evaluation, and MLflow registration
 ├── app/                # FastAPI prediction service
 │   └── routers/        # Route handlers for /players and /predict
-├── streamlit_app/      # Streamlit UI — calls the FastAPI service over HTTP
+├── streamlit_app/      # Streamlit dashboard — calls the FastAPI service over HTTP
 ├── utils/              # Shared feature definitions and preprocessing transforms
-├── scripts/            # Utility scripts for CI/CD workflows
+├── scripts/            # Utility scripts (production model selection, Docker rebuild)
 ├── data/               # Raw / processed Statcast data (gitignored)
 ├── mlruns/             # MLflow experiment tracking and model registry (gitignored)
-├── requirements.txt        # Runtime dependencies (what ships in the container)
-├── requirements-dev.txt    # Dev superset: runtime + Jupyter + plotting + lint/test/hooks
-└── README.md
+├── Dockerfile          # API service image (mlruns/ baked in at build time)
+├── Dockerfile.streamlit
+├── docker-compose.yml
+├── requirements.txt        # Runtime dependencies
+└── requirements-dev.txt    # Dev superset: runtime + Jupyter + lint/test tools
 ```
